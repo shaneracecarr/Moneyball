@@ -1,24 +1,23 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
-import { sql } from "drizzle-orm";
+import { pgTable, text, integer, doublePrecision, boolean, timestamp } from "drizzle-orm/pg-core";
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name"),
-  isAdmin: integer("is_admin", { mode: "boolean" })
+  isAdmin: boolean("is_admin")
     .notNull()
     .default(false),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .defaultNow(),
+  updatedAt: timestamp("updated_at")
     .notNull()
-    .$defaultFn(() => new Date())
+    .defaultNow()
     .$onUpdate(() => new Date()),
 });
 
-export const leagues = sqliteTable("leagues", {
+export const leagues = pgTable("leagues", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   numberOfTeams: integer("number_of_teams").notNull().default(12),
@@ -26,7 +25,7 @@ export const leagues = sqliteTable("leagues", {
   createdBy: text("created_by")
     .notNull()
     .references(() => users.id),
-  isMockLeague: integer("is_mock_league", { mode: "boolean" })
+  isMockLeague: boolean("is_mock_league")
     .notNull()
     .default(false),
   currentWeek: integer("current_week").notNull().default(0),
@@ -35,16 +34,16 @@ export const leagues = sqliteTable("leagues", {
   })
     .notNull()
     .default("setup"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .defaultNow(),
+  updatedAt: timestamp("updated_at")
     .notNull()
-    .$defaultFn(() => new Date())
+    .defaultNow()
     .$onUpdate(() => new Date()),
 });
 
-export const leagueSettings = sqliteTable("league_settings", {
+export const leagueSettings = pgTable("league_settings", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   leagueId: text("league_id")
     .notNull()
@@ -62,21 +61,21 @@ export const leagueSettings = sqliteTable("league_settings", {
   scoringFormat: text("scoring_format", {
     enum: ["standard", "half_ppr", "ppr"],
   }).notNull().default("standard"),
-  tradesEnabled: integer("trades_enabled", { mode: "boolean" })
+  tradesEnabled: boolean("trades_enabled")
     .notNull()
     .default(true),
   tradeDeadlineWeek: integer("trade_deadline_week"),
   draftTimerSeconds: integer("draft_timer_seconds").notNull().default(120),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .defaultNow(),
+  updatedAt: timestamp("updated_at")
     .notNull()
-    .$defaultFn(() => new Date())
+    .defaultNow()
     .$onUpdate(() => new Date()),
 });
 
-export const leagueMembers = sqliteTable("league_members", {
+export const leagueMembers = pgTable("league_members", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   leagueId: text("league_id")
     .notNull()
@@ -84,18 +83,18 @@ export const leagueMembers = sqliteTable("league_members", {
   userId: text("user_id")
     .references(() => users.id),
   teamName: text("team_name"),
-  isBot: integer("is_bot", { mode: "boolean" })
+  isBot: boolean("is_bot")
     .notNull()
     .default(false),
-  isCommissioner: integer("is_commissioner", { mode: "boolean" })
+  isCommissioner: boolean("is_commissioner")
     .notNull()
     .default(false),
-  joinedAt: integer("joined_at", { mode: "timestamp" })
+  joinedAt: timestamp("joined_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
 });
 
-export const drafts = sqliteTable("drafts", {
+export const drafts = pgTable("drafts", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   leagueId: text("league_id")
     .notNull()
@@ -105,19 +104,19 @@ export const drafts = sqliteTable("drafts", {
     .default("scheduled"),
   numberOfRounds: integer("number_of_rounds").notNull().default(15),
   currentPick: integer("current_pick").notNull().default(1),
-  scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
-  startedAt: integer("started_at", { mode: "timestamp" }),
-  completedAt: integer("completed_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  scheduledAt: timestamp("scheduled_at"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .defaultNow(),
+  updatedAt: timestamp("updated_at")
     .notNull()
-    .$defaultFn(() => new Date())
+    .defaultNow()
     .$onUpdate(() => new Date()),
 });
 
-export const draftOrder = sqliteTable("draft_order", {
+export const draftOrder = pgTable("draft_order", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   draftId: text("draft_id")
     .notNull()
@@ -128,7 +127,7 @@ export const draftOrder = sqliteTable("draft_order", {
   position: integer("position").notNull(),
 });
 
-export const draftPicks = sqliteTable("draft_picks", {
+export const draftPicks = pgTable("draft_picks", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   draftId: text("draft_id")
     .notNull()
@@ -141,12 +140,12 @@ export const draftPicks = sqliteTable("draft_picks", {
     .references(() => leagueMembers.id),
   pickNumber: integer("pick_number").notNull(),
   round: integer("round").notNull(),
-  pickedAt: integer("picked_at", { mode: "timestamp" })
+  pickedAt: timestamp("picked_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
 });
 
-export const rosterPlayers = sqliteTable("roster_players", {
+export const rosterPlayers = pgTable("roster_players", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   memberId: text("member_id")
     .notNull()
@@ -158,12 +157,12 @@ export const rosterPlayers = sqliteTable("roster_players", {
   acquiredVia: text("acquired_via", { enum: ["draft", "free_agent", "trade"] })
     .notNull()
     .default("draft"),
-  acquiredAt: integer("acquired_at", { mode: "timestamp" })
+  acquiredAt: timestamp("acquired_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
 });
 
-export const matchups = sqliteTable("matchups", {
+export const matchups = pgTable("matchups", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   leagueId: text("league_id")
     .notNull()
@@ -175,14 +174,14 @@ export const matchups = sqliteTable("matchups", {
   team2MemberId: text("team2_member_id")
     .notNull()
     .references(() => leagueMembers.id),
-  team1Score: real("team1_score"),
-  team2Score: real("team2_score"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  team1Score: doublePrecision("team1_score"),
+  team2Score: doublePrecision("team2_score"),
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
 });
 
-export const players = sqliteTable("players", {
+export const players = pgTable("players", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   sleeperId: text("sleeper_id").notNull().unique(),
   rapidApiId: text("rapid_api_id").unique(),
@@ -200,16 +199,16 @@ export const players = sqliteTable("players", {
   weight: text("weight"),
   college: text("college"),
   headshotUrl: text("headshot_url"),
-  adp: real("adp"),
-  seasonPoints: real("season_points"),
+  adp: doublePrecision("adp"),
+  seasonPoints: doublePrecision("season_points"),
   rawStats: text("raw_stats"),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
+  updatedAt: timestamp("updated_at")
     .notNull()
-    .$defaultFn(() => new Date())
+    .defaultNow()
     .$onUpdate(() => new Date()),
 });
 
-export const trades = sqliteTable("trades", {
+export const trades = pgTable("trades", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   leagueId: text("league_id")
     .notNull()
@@ -220,12 +219,12 @@ export const trades = sqliteTable("trades", {
   status: text("status", { enum: ["proposed", "completed", "declined", "canceled"] })
     .notNull()
     .default("proposed"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
 });
 
-export const tradeParticipants = sqliteTable("trade_participants", {
+export const tradeParticipants = pgTable("trade_participants", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   tradeId: text("trade_id")
     .notNull()
@@ -237,10 +236,10 @@ export const tradeParticipants = sqliteTable("trade_participants", {
   decision: text("decision", { enum: ["accepted", "pending", "declined"] })
     .notNull()
     .default("pending"),
-  decidedAt: integer("decided_at", { mode: "timestamp" }),
+  decidedAt: timestamp("decided_at"),
 });
 
-export const tradeItems = sqliteTable("trade_items", {
+export const tradeItems = pgTable("trade_items", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   tradeId: text("trade_id")
     .notNull()
@@ -256,19 +255,19 @@ export const tradeItems = sqliteTable("trade_items", {
     .references(() => leagueMembers.id),
 });
 
-export const leagueActivity = sqliteTable("league_activity", {
+export const leagueActivity = pgTable("league_activity", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   leagueId: text("league_id")
     .notNull()
     .references(() => leagues.id),
   type: text("type", { enum: ["trade_completed", "free_agent_pickup"] }).notNull(),
   payload: text("payload").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
 });
 
-export const notifications = sqliteTable("notifications", {
+export const notifications = pgTable("notifications", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id")
     .notNull()
@@ -278,15 +277,15 @@ export const notifications = sqliteTable("notifications", {
     .references(() => trades.id),
   type: text("type", { enum: ["trade_proposed", "trade_accepted", "trade_declined", "trade_completed"] })
     .notNull(),
-  isRead: integer("is_read", { mode: "boolean" })
+  isRead: boolean("is_read")
     .notNull()
     .default(false),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
 });
 
-export const chatMessages = sqliteTable("chat_messages", {
+export const chatMessages = pgTable("chat_messages", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   leagueId: text("league_id")
     .notNull()
@@ -296,7 +295,7 @@ export const chatMessages = sqliteTable("chat_messages", {
   memberId: text("member_id").references(() => leagueMembers.id),
   text: text("text").notNull(),
   metadata: text("metadata"),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
 });

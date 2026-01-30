@@ -31,7 +31,21 @@
       "Bash(git remote add:*)",
       "Bash(test:*)",
       "Bash(git add:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__list_migrations",
+      "Bash(npm uninstall:*)",
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__get_project_url",
+      "Bash(npx next build:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "rapidapi-tank01-nfl"
+  ]
 }
