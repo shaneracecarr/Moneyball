@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "rapidapi-tank01-nfl": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://mcp.rapidapi.com",
+        "--header",
+        "x-api-host: tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com",
+        "--header",
+        "x-api-key: 760540a073msh39d8377336215fbp1f2ad5jsndc6dd586ff8f"
+      ]
+    }
+  }
+}
