@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { players } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 const RAPIDAPI_HOST =
   "tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com";
 const RAPIDAPI_KEY = "760540a073msh39d8377336215fbp1f2ad5jsndc6dd586ff8f";

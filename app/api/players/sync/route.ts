@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { upsertPlayer, deleteAllPlayers } from "@/lib/db/queries";
 
+export const dynamic = "force-dynamic";
+
 const ALLOWED_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
 export async function POST(request: NextRequest) {
