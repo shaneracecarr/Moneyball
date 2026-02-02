@@ -7,6 +7,8 @@ import { PlayersFilters } from "@/components/players/players-filters";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
+export const dynamic = "force-dynamic";
+
 const ITEMS_PER_PAGE = 50;
 
 export default async function PlayersPage({

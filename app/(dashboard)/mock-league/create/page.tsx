@@ -2,6 +2,8 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { MockLeagueSetup } from "@/components/mock-league/mock-league-setup";
 
+export const dynamic = "force-dynamic";
+
 export default async function CreateMockLeaguePage() {
   const session = await auth();
   if (!session?.user) {
