@@ -10,6 +10,7 @@ if (!connectionString) {
 
 const client = postgres(connectionString || "postgres://localhost:5432/fallback", {
   prepare: false,
+  ssl: { rejectUnauthorized: false },
 });
 
 export const db = drizzle(client, { schema });
