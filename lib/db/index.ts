@@ -5,12 +5,12 @@ import * as schema from "./schema";
 const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
 
 if (!connectionString) {
-  console.warn("DATABASE_URL or POSTGRES_URL is not set — database queries will fail at runtime.");
+  throw new Error("DATABASE_URL or POSTGRES_URL environment variable is not set");
 }
 
-const client = postgres(connectionString || "postgres://localhost:5432/fallback", {
+const client = postgres(connectionString, {
   prepare: false,
-  ssl: { rejectUnauthorized: false },
+  ssl: "require",
 });
 
 export const db = drizzle(client, { schema });
