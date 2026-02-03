@@ -3,7 +3,7 @@
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { leagues, users } from "@/lib/db/schema";
-import { eq, and, ne, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import {
     getLeagueMatchups,
     getMemberRosterWithAdp,
@@ -14,7 +14,7 @@ import {
     getLeagueMembers,
 } from "@/lib/db/queries";
 import { generateSlotConfig } from "@/lib/roster-config";
-import { calculateTeamScore } from "@/lib/mock-league-utils";
+import { calculateTeamScore } from "@/lib/scoring-utils";
 
 // Check if current user is admin
 // TODO: Re-enable proper admin check later
@@ -36,12 +36,7 @@ async function getActiveLeagues() {
             phase: leagues.phase,
         })
         .from(leagues)
-        .where(
-            and(
-                eq(leagues.isMockLeague, false),
-                inArray(leagues.phase, ["pre_week", "week_active"])
-            )
-        );
+        .where(inArray(leagues.phase, ["pre_week", "week_active"]));
 }
 
 // Admin action: Start the current week for all leagues

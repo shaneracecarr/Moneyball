@@ -10,7 +10,8 @@ Moneyball is a fantasy football league management application built with Next.js
 
 - **Framework**: Next.js 14 with App Router, TypeScript
 - **Authentication**: NextAuth v5 (Auth.js) with credentials provider
-- **Database**: SQLite with Drizzle ORM (better-sqlite3 driver)
+- **Database**: PostgreSQL (Supabase) with Drizzle ORM (postgres-js driver)
+- **Hosting**: Vercel (serverless functions)
 - **Styling**: Tailwind CSS with custom design system
 - **UI Components**: shadcn-style components with CVA (class-variance-authority), Radix UI primitives
 - **Validation**: Zod schemas for forms and data
@@ -30,13 +31,7 @@ app/
     dashboard/page.tsx              # Main dashboard
     admin/page.tsx                  # Admin page
     players/page.tsx                # Player browser with filters + "Add to Team"
-    mock-draft/page.tsx             # Mock draft setup (creates a mock league behind the scenes, redirects to draft board)
-    mock-league/
-      page.tsx                      # Mock leagues list
-      create/page.tsx               # Create mock league form
-      [id]/page.tsx                 # Mock league hub (standings, simulate week)
-      [id]/draft/page.tsx           # Mock league draft board (vs bots)
-      [id]/team/page.tsx            # Mock league team roster management
+    mock-draft/page.tsx             # Client-side mock draft against AI
     my-teams/page.tsx               # All user leagues with roster status
     leagues/
       create/page.tsx               # Create league form (with settings configuration)
@@ -54,8 +49,7 @@ components/
   auth/       # login-form, signup-form
   dashboard/  # navbar
   draft/      # draft-board, draft-setup-card, draft-complete-summary, player-list, team-roster
-  mock-draft/ # mock-draft-setup-new (creates mock league + redirects to draft), mock-draft-board (legacy client-side only, unused), mock-draft-setup (legacy, unused)
-  mock-league/ # mock-league-setup, mock-league-draft, mock-league-hub, week-results
+  mock-draft/ # mock-draft-board (client-side draft vs AI), mock-draft-setup (setup form)
   players/    # players-filters, players-table (with "Add to Team" actions)
   roster/     # team-roster-page, roster-section, free-agent-search
   leagues/    # copy-invite-code, set-active-league, league-settings-form, activity-feed
@@ -63,7 +57,7 @@ components/
 
 lib/
   db/
-    index.ts          # SQLite/Drizzle connection
+    index.ts          # PostgreSQL/Drizzle connection (Supabase)
     schema.ts         # All table definitions
     queries.ts        # All database query functions
   actions/
@@ -73,7 +67,6 @@ lib/
     roster.ts         # getUserRosterAction, movePlayerAction, pickupPlayerAction, dropAndAddAction, dropPlayerAction, searchFreeAgentsAction, setActiveLeagueAction
     settings.ts       # getLeagueSettingsAction, updateLeagueSettingsAction
     mock-draft.ts     # getAllPlayersAction
-    mock-league.ts    # createMockLeagueAction, getMockLeagueStateAction, makeBotDraftPicksAction, makeUserDraftPickAction, simulateWeekAction, getUserMockLeaguesAction, deleteMockLeagueAction, searchMockDraftPlayersAction
   validations/
     auth.ts           # signUpSchema, signInSchema, createLeagueSchema
     draft.ts          # setupDraftSchema, makePickSchema
@@ -82,7 +75,7 @@ lib/
   league-settings.ts  # LeagueSettings interface and DEFAULT_LEAGUE_SETTINGS
   roster-config.ts    # SlotConfig interface and generateSlotConfig() for dynamic roster slots
   draft-utils.ts      # getSnakeDraftPosition, getMemberIdForPick
-  mock-league-utils.ts # AI_TEAM_NAMES, botDraftPick, generatePlayerScore, calculateTeamScore, botOptimizeLineup
+  scoring-utils.ts    # generatePlayerScore, calculateTeamScore (for league scoring)
   utils.ts            # cn() (classname merge), generateInviteCode()
 
 types/
@@ -110,7 +103,7 @@ Tables defined in `lib/db/schema.ts`:
 | Table | Purpose |
 |-------|---------|
 | `users` | User accounts (email, hashed password, name) |
-| `leagues` | Fantasy leagues (name, team count, invite code) |
+| `leagues` | Fantasy leagues (name, team count, invite code, currentWeek, phase) |
 | `league_settings` | Per-league configuration (roster slot counts, scoring format, trade rules) |
 | `league_members` | League membership with commissioner flag and team name |
 | `drafts` | Draft instances (status: scheduled/in_progress/completed, round count, current pick) |
@@ -138,7 +131,7 @@ All tables use UUID primary keys and timestamp tracking.
 - Type extensions for NextAuth in `types/next-auth.d.ts`
 
 ### Route Protection (middleware.ts)
-- **Protected**: `/dashboard/*`, `/leagues/*`, `/mock-draft/*`, `/mock-league/*`, `/my-teams/*`, `/players/*`
+- **Protected**: `/dashboard/*`, `/leagues/*`, `/mock-draft/*`, `/my-teams/*`, `/players/*`
 - **Public**: `/`, `/login`, `/signup`
 
 ### Active League Context
@@ -192,31 +185,15 @@ All tables use UUID primary keys and timestamp tracking.
 - Creator is automatically added as commissioner
 - League must reach capacity (`numberOfTeams`) before draft can begin
 
-### Mock League System
-- **Full season simulation** against AI bot opponents across 17 weeks
-- **Creation flow**: User picks team name, team count (4-14), draft rounds, draft position (1-N or random) → bots auto-fill remaining slots → draft starts immediately
-- **Draft board**: Sleeper-style full grid — rows are rounds, columns are teams, cells are color-coded by position (QB red, RB green, WR blue, TE amber, K purple, DEF orange). Dark theme. Available players panel on the right sorted by ADP with search and position filters.
-- **Draft position**: `createMockLeagueAction` accepts a `draftPosition` param (1-N for specific slot, 0 for random). User is placed at that position in the draft order; bots are shuffled into remaining slots.
-- **Bot draft strategy**: ADP-aware position-priority by round (early rounds: RB/WR, mid rounds: add QB/TE, late rounds: K/DEF). Picks from top 3 candidates for variety.
-- **Post-draft**: Rosters auto-populated via `populateRosterFromDraft()`, 17-week round-robin schedule auto-generated, `currentWeek` set to 1
-- **Week simulation** (`simulateWeekAction`): Bots auto-optimize lineups before scoring. Scores generated per starter using ADP-based formulas with ±40% variance, boom/bust modifiers. Matchup scores saved, week advanced.
-- **Roster management**: User can move players, pick up free agents, drop players between simulated weeks (reuses existing roster actions and `TeamRosterPage` component)
-- **Standings**: W/L/T record + points for/against, sorted by wins → losses → points for
-- **Score formula** (in `lib/mock-league-utils.ts`): Base score varies by position and ADP, with random variance. QB base ~14-20, RB ~8-18, WR ~8-17, TE ~5-12, K/DEF ~6-13.
-- **Database flags**: `leagues.isMockLeague` (boolean), `leagueMembers.isBot` (boolean), `leagues.currentWeek` (integer)
-- **Data cleanup**: `deleteMockLeagueData()` removes all related data (matchups, rosters, draft picks, draft order, drafts, settings, members, league) in reverse dependency order
-- **Separation**: Mock leagues are excluded from regular league listings (`getUserLeagues` filters `isMockLeague = false`), and regular league actions (invite code join, etc.) are not used for mock leagues
-- Dashboard shows both regular and mock leagues; navbar has a "Mock League" link
-
 ### Mock Draft (Standalone)
-- `/mock-draft` now creates a mock league behind the scenes (named "Mock Draft") and redirects to `/mock-league/[id]/draft`
-- Uses the same Sleeper-style draft board, bot AI, and DB-backed picks as mock leagues
-- Setup form: team count, rounds, draft position — same fields as the old mock draft
-- After draft completion, user lands on the mock league hub and can optionally continue into season simulation
-- The old client-side-only `MockDraftBoard` component (`components/mock-draft/mock-draft-board.tsx`) is no longer used but remains in the codebase
+- `/mock-draft` provides a client-side-only mock draft experience against AI opponents
+- No database persistence — draft state lives entirely in React component state
+- Setup form: team count, rounds, draft position
+- AI uses position-priority strategy by round (early rounds: RB/WR, mid rounds: add QB/TE, late rounds: K/DEF)
+- After draft completion, shows summary with all picks; user can start a new mock draft
 
 ### Navigation
-- Navbar links: Dashboard, Players, My Teams, Mock Draft, Mock League, Admin
+- Navbar links: Dashboard, Players, Mock Draft, Admin (when active league selected: League, Team, Matchup, Standings, Trades, Inbox, Chat)
 - "My Teams" page (`/my-teams`) lists all user's leagues with roster fill counts and links to manage each team
 - League detail page has "My Team" button linking to `/leagues/[id]/team` and "Settings" button linking to `/leagues/[id]/settings`
 
@@ -226,13 +203,70 @@ All tables use UUID primary keys and timestamp tracking.
 - Responsive design with mobile-first approach
 - Gradient backgrounds on hero and auth pages
 
+## Supabase + Vercel Connection (CRITICAL)
+
+This section documents the working configuration for connecting Next.js on Vercel to Supabase PostgreSQL.
+
+### The Problem
+Direct connection strings (`db.xxx.supabase.co:5432`) don't work with Vercel serverless functions because they don't maintain persistent connections.
+
+### The Solution
+Use the **Transaction Pooler** connection string from Supabase.
+
+### Connection String Format
+
+| Setting  | Direct (❌ Wrong)        | Transaction Pooler (✅ Correct)              |
+|----------|--------------------------|----------------------------------------------|
+| Host     | `db.xxx.supabase.co`     | `aws-0-us-east-1.pooler.supabase.com`        |
+| Port     | `5432`                   | `6543`                                       |
+| Username | `postgres`               | `postgres.PROJECT_REF`                       |
+
+Get the Transaction Pooler URL from: **Supabase Dashboard → Connect** (or Project Settings → Database)
+
+### Vercel Environment Variables
+```
+DATABASE_URL=postgresql://postgres.xxx:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+AUTH_SECRET=<any random string>
+AUTH_URL=https://your-app.vercel.app
+```
+
+### Local .env.local
+```
+DATABASE_URL="postgresql://postgres.xxx:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+AUTH_SECRET="your-secret"
+AUTH_URL="http://localhost:3000"
+```
+
+### Database Connection Code (lib/db/index.ts)
+```typescript
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema";
+
+const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL or POSTGRES_URL environment variable is not set");
+}
+
+const client = postgres(connectionString, {
+  prepare: false,  // Required for transaction pooler
+  ssl: "require",  // Required for Supabase
+});
+
+export const db = drizzle(client, { schema });
+```
+
+**Key settings:**
+- `prepare: false` — Required for Supabase transaction pooler (prepared statements don't work with connection pooling)
+- `ssl: "require"` — Required for all Supabase connections
+
 ## Important Notes
 
-- Build warnings about Edge Runtime are expected (SQLite is Node.js-only)
+- Build warnings about Edge Runtime are expected (postgres-js is Node.js-only)
 - The `tsconfig.json` does not enable `downlevelIteration` — use `Array.from()` when iterating Maps
 - `queries.ts` uses `as any` casts in a few places to work around Drizzle's query builder types when applying conditional `.where()` clauses
-- The mock draft feature now creates a mock league behind the scenes and uses the Sleeper-style draft board (the old client-side-only mock draft board is no longer used)
 - The `.next` cache can become corrupted — if you see webpack module errors or "missing required error components", delete `.next` and restart the dev server (`rm -rf .next && npm run dev`)
 - When killing the dev server on Windows, use `taskkill //f //im node.exe` (double slashes for flags in Git Bash)
-- After modifying `lib/db/schema.ts`, always run `npx drizzle-kit push` to sync changes to the SQLite database
+- After modifying `lib/db/schema.ts`, always run `npx drizzle-kit push` to sync changes to the Supabase database
 - The `matchup-view.tsx` component still uses hardcoded roster slots — it should be updated to use dynamic slot config if matchup scoring needs to respect custom roster configurations

@@ -25,9 +25,6 @@ export const leagues = pgTable("leagues", {
   createdBy: text("created_by")
     .notNull()
     .references(() => users.id),
-  isMockLeague: boolean("is_mock_league")
-    .notNull()
-    .default(false),
   currentWeek: integer("current_week").notNull().default(0),
   phase: text("phase", {
     enum: ["setup", "drafting", "pre_week", "week_active", "complete"],
@@ -83,9 +80,6 @@ export const leagueMembers = pgTable("league_members", {
   userId: text("user_id")
     .references(() => users.id),
   teamName: text("team_name"),
-  isBot: boolean("is_bot")
-    .notNull()
-    .default(false),
   isCommissioner: boolean("is_commissioner")
     .notNull()
     .default(false),

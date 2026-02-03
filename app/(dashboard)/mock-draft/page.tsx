@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { MockDraftSetupNew } from "@/components/mock-draft/mock-draft-setup-new";
+import { MockDraftBoard } from "@/components/mock-draft/mock-draft-board";
+import { getAllPlayersAction } from "@/lib/actions/mock-draft";
 
 export const dynamic = "force-dynamic";
 
@@ -10,5 +11,6 @@ export default async function MockDraftPage() {
     redirect("/login");
   }
 
-  return <MockDraftSetupNew />;
+  const { players } = await getAllPlayersAction();
+  return <MockDraftBoard allPlayers={players} />;
 }

@@ -5,7 +5,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Check if the route needs protection
-  if (pathname.startsWith("/dashboard") || pathname.startsWith("/leagues") || pathname.startsWith("/mock-draft") || pathname.startsWith("/mock-league") || pathname.startsWith("/my-teams") || pathname.startsWith("/players")) {
+  if (pathname.startsWith("/dashboard") || pathname.startsWith("/leagues") || pathname.startsWith("/mock-draft") || pathname.startsWith("/my-teams") || pathname.startsWith("/players")) {
     // Check for session token in cookies
     const sessionToken =
       request.cookies.get("authjs.session-token")?.value ||
@@ -21,5 +21,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/leagues/:path*", "/mock-draft/:path*", "/mock-league/:path*", "/my-teams/:path*", "/players/:path*"],
+  matcher: ["/dashboard/:path*", "/leagues/:path*", "/mock-draft/:path*", "/my-teams/:path*", "/players/:path*"],
 };

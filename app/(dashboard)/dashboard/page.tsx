@@ -2,7 +2,6 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { getUserLeaguesAction } from "@/lib/actions/leagues";
-import { getUserMockLeaguesAction } from "@/lib/actions/mock-league";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +16,6 @@ export default async function DashboardPage() {
   }
 
   const { leagues } = await getUserLeaguesAction();
-  const { leagues: mockLeagues } = await getUserMockLeaguesAction();
   const activeLeagueId = cookies().get("active_league_id")?.value || null;
 
   return (
@@ -113,61 +111,6 @@ export default async function DashboardPage() {
                       {statusLabel}
                     </span>
                   </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Mock Leagues Section */}
-      <div className="mt-12 mb-6 flex justify-between items-center">
-        <h2 className="text-2xl font-semibold text-gray-900">Mock Leagues</h2>
-        <Link href="/mock-league/create">
-          <Button variant="outline">Create Mock League</Button>
-        </Link>
-      </div>
-
-      {mockLeagues.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No Mock Leagues</CardTitle>
-            <CardDescription>
-              Play a full season against AI opponents. Draft, manage your roster, and compete across 17 weeks.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/mock-league/create">
-              <Button variant="outline">Create Mock League</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {mockLeagues.map((league) => {
-            const statusLabel =
-              league.draftStatus === "in_progress"
-                ? "Drafting"
-                : league.currentWeek > 17
-                  ? "Season Complete"
-                  : league.currentWeek >= 1
-                    ? `Week ${league.currentWeek}`
-                    : "Setting Up";
-
-            return (
-              <Link key={league.id} href={`/mock-league/${league.id}`}>
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle>{league.name}</CardTitle>
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
-                        {statusLabel}
-                      </span>
-                    </div>
-                    <CardDescription>
-                      {league.numberOfTeams} teams (vs AI)
-                    </CardDescription>
-                  </CardHeader>
                 </Card>
               </Link>
             );

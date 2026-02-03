@@ -78,12 +78,6 @@ export async function Navbar() {
                 Mock Draft
               </Link>
               <Link
-                href="/mock-league"
-                className="text-sm font-medium text-gray-700 hover:text-indigo-600"
-              >
-                Mock League
-              </Link>
-              <Link
                 href="/admin"
                 className="text-sm font-medium text-gray-700 hover:text-indigo-600"
               >

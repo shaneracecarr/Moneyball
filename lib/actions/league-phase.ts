@@ -12,7 +12,7 @@ import {
   updateLeaguePhase,
 } from "@/lib/db/queries";
 import { generateSlotConfig } from "@/lib/roster-config";
-import { calculateTeamScore } from "@/lib/mock-league-utils";
+import { calculateTeamScore } from "@/lib/scoring-utils";
 
 export async function startWeekAction(leagueId: string) {
   try {
@@ -21,7 +21,6 @@ export async function startWeekAction(leagueId: string) {
 
     const league = await getLeagueById(leagueId);
     if (!league) return { error: "League not found" };
-    if (league.isMockLeague) return { error: "Use mock league actions for mock leagues" };
 
     const members = await getLeagueMembers(leagueId);
     const currentMember = members.find((m) => m.userId === session.user.id);
@@ -48,7 +47,6 @@ export async function advanceWeekAction(leagueId: string) {
 
     const league = await getLeagueById(leagueId);
     if (!league) return { error: "League not found" };
-    if (league.isMockLeague) return { error: "Use mock league actions for mock leagues" };
 
     const members = await getLeagueMembers(leagueId);
     const currentMember = members.find((m) => m.userId === session.user.id);

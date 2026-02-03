@@ -36,12 +36,11 @@ export async function createLeagueMember(
   leagueId: string,
   userId: string | null,
   teamName: string | null,
-  isCommissioner: boolean,
-  isBot: boolean = false
+  isCommissioner: boolean
 ) {
   const result = await db
     .insert(leagueMembers)
-    .values({ leagueId, userId, teamName, isCommissioner, isBot })
+    .values({ leagueId, userId, teamName, isCommissioner })
     .returning();
   return result[0];
 }
@@ -60,23 +59,7 @@ export async function getUserLeagues(userId: string) {
     })
     .from(leagueMembers)
     .innerJoin(leagues, eq(leagueMembers.leagueId, leagues.id))
-    .where(and(eq(leagueMembers.userId, userId), eq(leagues.isMockLeague, false)));
-
-  return result;
-}
-
-export async function getUserMockLeagues(userId: string) {
-  const result = await db
-    .select({
-      id: leagues.id,
-      name: leagues.name,
-      numberOfTeams: leagues.numberOfTeams,
-      currentWeek: leagues.currentWeek,
-      createdAt: leagues.createdAt,
-    })
-    .from(leagueMembers)
-    .innerJoin(leagues, eq(leagueMembers.leagueId, leagues.id))
-    .where(and(eq(leagueMembers.userId, userId), eq(leagues.isMockLeague, true)));
+    .where(eq(leagueMembers.userId, userId));
 
   return result;
 }
@@ -103,7 +86,6 @@ export async function getLeagueMembers(leagueId: string) {
       userName: users.name,
       userEmail: users.email,
       teamName: leagueMembers.teamName,
-      isBot: leagueMembers.isBot,
       isCommissioner: leagueMembers.isCommissioner,
       joinedAt: leagueMembers.joinedAt,
     })
@@ -1111,35 +1093,3 @@ export async function updateLeagueWeekAndPhase(
     .where(eq(leagues.id, leagueId));
 }
 
-export async function deleteMockLeagueData(leagueId: string) {
-  // Delete in reverse dependency order
-  await db.delete(matchups).where(eq(matchups.leagueId, leagueId));
-
-  // Get all member IDs for this league
-  const members = await db
-    .select({ id: leagueMembers.id })
-    .from(leagueMembers)
-    .where(eq(leagueMembers.leagueId, leagueId));
-  const memberIds = members.map((m) => m.id);
-
-  if (memberIds.length > 0) {
-    await db.delete(rosterPlayers).where(inArray(rosterPlayers.memberId, memberIds));
-  }
-
-  // Get draft for this league
-  const draft = await db
-    .select({ id: drafts.id })
-    .from(drafts)
-    .where(eq(drafts.leagueId, leagueId))
-    .limit(1);
-
-  if (draft[0]) {
-    await db.delete(draftPicks).where(eq(draftPicks.draftId, draft[0].id));
-    await db.delete(draftOrder).where(eq(draftOrder.draftId, draft[0].id));
-    await db.delete(drafts).where(eq(drafts.id, draft[0].id));
-  }
-
-  await db.delete(leagueSettings).where(eq(leagueSettings.leagueId, leagueId));
-  await db.delete(leagueMembers).where(eq(leagueMembers.leagueId, leagueId));
-  await db.delete(leagues).where(eq(leagues.id, leagueId));
-}
