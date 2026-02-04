@@ -1,3 +1,5 @@
+export type WaiverType = "none" | "standard" | "faab";
+
 export interface LeagueSettings {
   qbCount: number;
   rbCount: number;
@@ -12,6 +14,9 @@ export interface LeagueSettings {
   tradesEnabled: boolean;
   tradeDeadlineWeek: number | null;
   draftTimerSeconds: number;
+  // Waiver settings
+  waiverType: WaiverType;
+  faabBudget: number | null; // Only used when waiverType is "faab"
 }
 
 export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
@@ -28,4 +33,14 @@ export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
   tradesEnabled: true,
   tradeDeadlineWeek: null,
   draftTimerSeconds: 120,
+  // Waiver defaults - standard waivers for regular leagues
+  waiverType: "standard",
+  faabBudget: null,
+};
+
+// Mock leagues don't have waivers - always free agency
+export const MOCK_LEAGUE_SETTINGS: LeagueSettings = {
+  ...DEFAULT_LEAGUE_SETTINGS,
+  waiverType: "none",
+  faabBudget: null,
 };

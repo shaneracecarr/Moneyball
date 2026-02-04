@@ -15,11 +15,18 @@ const SCORING_LABELS: Record<string, string> = {
   ppr: "Full PPR",
 };
 
+const WAIVER_TYPE_LABELS: Record<string, string> = {
+  none: "No Waivers (Free Agency Only)",
+  standard: "Standard (Reverse Standings Priority)",
+  faab: "FAAB (Free Agent Acquisition Budget)",
+};
+
 interface LeagueSettingsFormProps {
   leagueId: string;
   settings: LeagueSettings;
   isCommissioner: boolean;
   locked: boolean;
+  isMock?: boolean;
 }
 
 export function LeagueSettingsForm({
@@ -27,6 +34,7 @@ export function LeagueSettingsForm({
   settings: initialSettings,
   isCommissioner,
   locked,
+  isMock = false,
 }: LeagueSettingsFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -228,6 +236,103 @@ export function LeagueSettingsForm({
           )}
         </CardContent>
       </Card>
+
+      {/* Waiver Settings - Only show for non-mock leagues */}
+      {!isMock && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Waivers</CardTitle>
+            <CardDescription>How free agent acquisitions are handled</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {editable ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="waiverType">Waiver System</Label>
+                  <select
+                    id="waiverType"
+                    value={settings.waiverType}
+                    onChange={(e) => {
+                      const newType = e.target.value as "none" | "standard" | "faab";
+                      updateSetting("waiverType", newType);
+                      if (newType !== "faab") {
+                        updateSetting("faabBudget", null);
+                      } else if (!settings.faabBudget) {
+                        updateSetting("faabBudget", 100);
+                      }
+                    }}
+                    disabled={isPending}
+                    className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="standard">Standard (Reverse Standings Priority)</option>
+                    <option value="faab">FAAB (Free Agent Acquisition Budget)</option>
+                  </select>
+                </div>
+
+                {settings.waiverType === "standard" && (
+                  <p className="text-xs text-gray-500">
+                    Waiver priority is based on reverse standings — last place gets first priority.
+                    After a successful claim, that team moves to the back of the waiver order.
+                  </p>
+                )}
+
+                {settings.waiverType === "faab" && (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="faabBudget">Season Budget ($)</Label>
+                      <Input
+                        id="faabBudget"
+                        type="number"
+                        min={50}
+                        max={1000}
+                        value={settings.faabBudget ?? 100}
+                        onChange={(e) => updateSetting("faabBudget", Number(e.target.value))}
+                        disabled={isPending}
+                        className="h-10 max-w-[200px]"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Each team gets ${settings.faabBudget ?? 100} to bid on waiver players all season.
+                      Highest bid wins. Ties broken by reverse standings. Teams can bid $0.
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm text-gray-500">Waiver System</p>
+                  <p className="font-medium">{WAIVER_TYPE_LABELS[settings.waiverType] || "Standard"}</p>
+                </div>
+                {settings.waiverType === "faab" && settings.faabBudget && (
+                  <div>
+                    <p className="text-sm text-gray-500">FAAB Budget</p>
+                    <p className="font-medium">${settings.faabBudget}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Mock League Notice */}
+      {isMock && (
+        <Card className="border-purple-200 bg-purple-50">
+          <CardHeader>
+            <CardTitle className="text-lg text-purple-900">Free Agency Only</CardTitle>
+            <CardDescription className="text-purple-700">
+              Mock leagues do not have waivers
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-purple-700">
+              All players in this mock league are free agents and can be picked up instantly
+              (first come, first served) until their game starts.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Save Button */}
       {editable && (

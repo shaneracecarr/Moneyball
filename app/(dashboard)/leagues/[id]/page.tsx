@@ -116,16 +116,28 @@ export default async function LeagueDetailPage({ params }: { params: { id: strin
             </div>
 
             {leagueSettings && (
-              <div>
-                <p className="text-sm font-medium text-gray-500">Scoring Format</p>
-                <p className="text-lg">
-                  {leagueSettings.scoringFormat === "standard"
-                    ? "Standard"
-                    : leagueSettings.scoringFormat === "half_ppr"
-                      ? "Half PPR"
-                      : "Full PPR"}
-                </p>
-              </div>
+              <>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Scoring Format</p>
+                  <p className="text-lg">
+                    {leagueSettings.scoringFormat === "standard"
+                      ? "Standard"
+                      : leagueSettings.scoringFormat === "half_ppr"
+                        ? "Half PPR"
+                        : "Full PPR"}
+                  </p>
+                </div>
+                {!league.isMock && leagueSettings.waiverType && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Waivers</p>
+                    <p className="text-lg">
+                      {leagueSettings.waiverType === "faab"
+                        ? `FAAB ($${leagueSettings.faabBudget || 100})`
+                        : "Standard"}
+                    </p>
+                  </div>
+                )}
+              </>
             )}
 
             <div>

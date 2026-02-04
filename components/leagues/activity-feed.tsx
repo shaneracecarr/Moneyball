@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 interface ActivityItem {
   id: string;
   leagueId: string;
-  type: "trade_completed" | "free_agent_pickup";
+  type: "trade_completed" | "free_agent_pickup" | "waiver_claim" | "player_dropped";
   payload: string;
   createdAt: Date;
 }
@@ -79,6 +79,65 @@ function ActivityItemDisplay({ item }: { item: ActivityItem }) {
             )}
           </p>
           <p className="text-xs text-gray-500">Free agent pickup</p>
+        </div>
+        <span className="text-xs text-gray-400 flex-shrink-0">
+          {formatRelativeTime(item.createdAt)}
+        </span>
+      </div>
+    );
+  }
+
+  if (item.type === "waiver_claim") {
+    const playerName = (payload.playerName as string) || "Unknown player";
+    const playerPosition = (payload.playerPosition as string) || "";
+    const teamName = (payload.teamName as string) || "A team";
+    const bidAmount = payload.bidAmount as number | undefined;
+    return (
+      <div className="flex items-start gap-3 py-3 border-b last:border-b-0">
+        <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-gray-900">
+            <span className="font-medium">{teamName}</span> claimed{" "}
+            <span className="font-medium">{playerName}</span>
+            {playerPosition && (
+              <span className="ml-1 text-xs text-gray-500">({playerPosition})</span>
+            )}
+          </p>
+          <p className="text-xs text-gray-500">
+            Waiver claim{bidAmount !== undefined ? ` ($${bidAmount})` : ""}
+          </p>
+        </div>
+        <span className="text-xs text-gray-400 flex-shrink-0">
+          {formatRelativeTime(item.createdAt)}
+        </span>
+      </div>
+    );
+  }
+
+  if (item.type === "player_dropped") {
+    const playerName = (payload.playerName as string) || "Unknown player";
+    const playerPosition = (payload.playerPosition as string) || "";
+    const teamName = (payload.teamName as string) || "A team";
+    return (
+      <div className="flex items-start gap-3 py-3 border-b last:border-b-0">
+        <div className="flex-shrink-0 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+          <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-gray-900">
+            <span className="font-medium">{teamName}</span> dropped{" "}
+            <span className="font-medium">{playerName}</span>
+            {playerPosition && (
+              <span className="ml-1 text-xs text-gray-500">({playerPosition})</span>
+            )}
+          </p>
+          <p className="text-xs text-gray-500">Player released to waivers</p>
         </div>
         <span className="text-xs text-gray-400 flex-shrink-0">
           {formatRelativeTime(item.createdAt)}

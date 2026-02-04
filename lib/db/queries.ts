@@ -1,6 +1,6 @@
 import { eq, and, or, like, desc, asc, notInArray, inArray, sql, isNotNull, ne } from "drizzle-orm";
 import { db } from "./index";
-import { users, leagues, leagueMembers, players, drafts, draftOrder, draftPicks, rosterPlayers, matchups, trades, tradeParticipants, tradeItems, notifications, leagueActivity, chatMessages, leagueSettings, mockPlayerStats } from "./schema";
+import { users, leagues, leagueMembers, players, drafts, draftOrder, draftPicks, rosterPlayers, matchups, trades, tradeParticipants, tradeItems, notifications, leagueActivity, chatMessages, leagueSettings, mockPlayerStats, waiverPlayers, waiverClaims, faabBalances, waiverOrder } from "./schema";
 import { DEFAULT_LEAGUE_SETTINGS, type LeagueSettings } from "../league-settings";
 import { generateSlotConfig } from "../roster-config";
 
@@ -1012,6 +1012,8 @@ export async function getLeagueSettings(leagueId: string): Promise<LeagueSetting
     tradesEnabled: row.tradesEnabled,
     tradeDeadlineWeek: row.tradeDeadlineWeek,
     draftTimerSeconds: row.draftTimerSeconds,
+    waiverType: (row.waiverType as LeagueSettings["waiverType"]) || "standard",
+    faabBudget: row.faabBudget,
   };
 }
 
@@ -1283,5 +1285,323 @@ export async function getAllRosteredPlayerIds(leagueId: string) {
     .innerJoin(leagueMembers, eq(rosterPlayers.memberId, leagueMembers.id))
     .where(eq(leagueMembers.leagueId, leagueId));
   return result.map((r) => r.playerId);
+}
+
+// ============================================================================
+// WAIVER SYSTEM QUERIES
+// ============================================================================
+
+// Check if a player is on waivers in a league
+export async function isPlayerOnWaivers(leagueId: string, playerId: string) {
+  const result = await db
+    .select()
+    .from(waiverPlayers)
+    .where(
+      and(
+        eq(waiverPlayers.leagueId, leagueId),
+        eq(waiverPlayers.playerId, playerId)
+      )
+    )
+    .limit(1);
+  return result.length > 0;
+}
+
+// Get all players currently on waivers in a league
+export async function getWaiverPlayers(leagueId: string) {
+  return db
+    .select({
+      id: waiverPlayers.id,
+      playerId: waiverPlayers.playerId,
+      waiverStart: waiverPlayers.waiverStart,
+      waiverEnd: waiverPlayers.waiverEnd,
+      droppedByMemberId: waiverPlayers.droppedByMemberId,
+      playerName: players.fullName,
+      playerPosition: players.position,
+      playerTeam: players.team,
+    })
+    .from(waiverPlayers)
+    .innerJoin(players, eq(waiverPlayers.playerId, players.id))
+    .where(eq(waiverPlayers.leagueId, leagueId))
+    .orderBy(desc(waiverPlayers.waiverStart));
+}
+
+// Add a player to waivers
+export async function addPlayerToWaivers(
+  leagueId: string,
+  playerId: string,
+  droppedByMemberId?: string
+) {
+  return db
+    .insert(waiverPlayers)
+    .values({
+      leagueId,
+      playerId,
+      droppedByMemberId: droppedByMemberId || null,
+      waiverStart: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [waiverPlayers.leagueId, waiverPlayers.playerId],
+      set: {
+        waiverStart: new Date(),
+        droppedByMemberId: droppedByMemberId || null,
+      },
+    });
+}
+
+// Remove a player from waivers (make them a free agent)
+export async function removePlayerFromWaivers(leagueId: string, playerId: string) {
+  return db
+    .delete(waiverPlayers)
+    .where(
+      and(
+        eq(waiverPlayers.leagueId, leagueId),
+        eq(waiverPlayers.playerId, playerId)
+      )
+    );
+}
+
+// Clear all waivers for a league (make all players free agents)
+export async function clearAllWaivers(leagueId: string) {
+  return db.delete(waiverPlayers).where(eq(waiverPlayers.leagueId, leagueId));
+}
+
+// Submit a waiver claim
+export async function submitWaiverClaim(
+  leagueId: string,
+  memberId: string,
+  playerId: string,
+  priority: number,
+  bidAmount?: number,
+  dropPlayerId?: string
+) {
+  return db
+    .insert(waiverClaims)
+    .values({
+      leagueId,
+      memberId,
+      playerId,
+      priority,
+      bidAmount: bidAmount ?? 0,
+      dropPlayerId: dropPlayerId || null,
+      status: "pending",
+    })
+    .returning();
+}
+
+// Get pending waiver claims for a league
+export async function getPendingWaiverClaims(leagueId: string) {
+  return db
+    .select({
+      id: waiverClaims.id,
+      memberId: waiverClaims.memberId,
+      playerId: waiverClaims.playerId,
+      bidAmount: waiverClaims.bidAmount,
+      priority: waiverClaims.priority,
+      dropPlayerId: waiverClaims.dropPlayerId,
+      status: waiverClaims.status,
+      createdAt: waiverClaims.createdAt,
+      playerName: players.fullName,
+      playerPosition: players.position,
+    })
+    .from(waiverClaims)
+    .innerJoin(players, eq(waiverClaims.playerId, players.id))
+    .where(
+      and(
+        eq(waiverClaims.leagueId, leagueId),
+        eq(waiverClaims.status, "pending")
+      )
+    )
+    .orderBy(asc(waiverClaims.priority), desc(waiverClaims.bidAmount));
+}
+
+// Get waiver claims by member
+export async function getMemberWaiverClaims(memberId: string) {
+  return db
+    .select({
+      id: waiverClaims.id,
+      playerId: waiverClaims.playerId,
+      bidAmount: waiverClaims.bidAmount,
+      priority: waiverClaims.priority,
+      dropPlayerId: waiverClaims.dropPlayerId,
+      status: waiverClaims.status,
+      createdAt: waiverClaims.createdAt,
+      playerName: players.fullName,
+      playerPosition: players.position,
+    })
+    .from(waiverClaims)
+    .innerJoin(players, eq(waiverClaims.playerId, players.id))
+    .where(eq(waiverClaims.memberId, memberId))
+    .orderBy(desc(waiverClaims.createdAt));
+}
+
+// Update waiver claim status
+export async function updateWaiverClaimStatus(
+  claimId: string,
+  status: "pending" | "awarded" | "outbid" | "canceled"
+) {
+  return db
+    .update(waiverClaims)
+    .set({ status, processedAt: status !== "pending" ? new Date() : null })
+    .where(eq(waiverClaims.id, claimId));
+}
+
+// Cancel a waiver claim
+export async function cancelWaiverClaim(claimId: string, memberId: string) {
+  return db
+    .update(waiverClaims)
+    .set({ status: "canceled" })
+    .where(
+      and(
+        eq(waiverClaims.id, claimId),
+        eq(waiverClaims.memberId, memberId),
+        eq(waiverClaims.status, "pending")
+      )
+    );
+}
+
+// FAAB Balance queries
+
+// Initialize FAAB balances for all members in a league
+export async function initializeFaabBalances(leagueId: string, budget: number) {
+  const members = await getLeagueMembers(leagueId);
+
+  for (const member of members) {
+    await db
+      .insert(faabBalances)
+      .values({
+        leagueId,
+        memberId: member.id,
+        balance: budget,
+        initialBudget: budget,
+      })
+      .onConflictDoNothing();
+  }
+}
+
+// Get FAAB balance for a member
+export async function getFaabBalance(memberId: string) {
+  const result = await db
+    .select()
+    .from(faabBalances)
+    .where(eq(faabBalances.memberId, memberId))
+    .limit(1);
+  return result[0];
+}
+
+// Get all FAAB balances for a league
+export async function getLeagueFaabBalances(leagueId: string) {
+  return db
+    .select({
+      memberId: faabBalances.memberId,
+      balance: faabBalances.balance,
+      initialBudget: faabBalances.initialBudget,
+      teamName: leagueMembers.teamName,
+    })
+    .from(faabBalances)
+    .innerJoin(leagueMembers, eq(faabBalances.memberId, leagueMembers.id))
+    .where(eq(faabBalances.leagueId, leagueId))
+    .orderBy(desc(faabBalances.balance));
+}
+
+// Deduct FAAB from a member's balance
+export async function deductFaabBalance(memberId: string, amount: number) {
+  return db
+    .update(faabBalances)
+    .set({
+      balance: sql`${faabBalances.balance} - ${amount}`,
+    })
+    .where(eq(faabBalances.memberId, memberId));
+}
+
+// Waiver Order queries
+
+// Initialize waiver order for a league (reverse of standings or random for new leagues)
+export async function initializeWaiverOrder(leagueId: string) {
+  const members = await getLeagueMembers(leagueId);
+
+  // Initial order is reverse of member join order (last to join gets first priority)
+  // This will be updated based on standings later
+  const reversedMembers = [...members].reverse();
+
+  for (let i = 0; i < reversedMembers.length; i++) {
+    await db
+      .insert(waiverOrder)
+      .values({
+        leagueId,
+        memberId: reversedMembers[i].id,
+        position: i + 1,
+      })
+      .onConflictDoUpdate({
+        target: [waiverOrder.leagueId, waiverOrder.memberId],
+        set: { position: i + 1 },
+      });
+  }
+}
+
+// Get waiver order for a league
+export async function getWaiverOrder(leagueId: string) {
+  return db
+    .select({
+      memberId: waiverOrder.memberId,
+      position: waiverOrder.position,
+      teamName: leagueMembers.teamName,
+    })
+    .from(waiverOrder)
+    .innerJoin(leagueMembers, eq(waiverOrder.memberId, leagueMembers.id))
+    .where(eq(waiverOrder.leagueId, leagueId))
+    .orderBy(asc(waiverOrder.position));
+}
+
+// Move a member to the back of the waiver order (after a successful claim)
+export async function moveToBackOfWaiverOrder(leagueId: string, memberId: string) {
+  // Get current order
+  const currentOrder = await getWaiverOrder(leagueId);
+
+  // Find the member's current position
+  const memberIndex = currentOrder.findIndex(o => o.memberId === memberId);
+  if (memberIndex === -1) return;
+
+  // Move everyone below them up by 1, and put this member at the end
+  for (let i = memberIndex + 1; i < currentOrder.length; i++) {
+    await db
+      .update(waiverOrder)
+      .set({ position: i })
+      .where(
+        and(
+          eq(waiverOrder.leagueId, leagueId),
+          eq(waiverOrder.memberId, currentOrder[i].memberId)
+        )
+      );
+  }
+
+  // Put the member at the end
+  await db
+    .update(waiverOrder)
+    .set({ position: currentOrder.length })
+    .where(
+      and(
+        eq(waiverOrder.leagueId, leagueId),
+        eq(waiverOrder.memberId, memberId)
+      )
+    );
+}
+
+// Update waiver order based on standings (reverse standings = last place gets first priority)
+export async function updateWaiverOrderFromStandings(leagueId: string, standingsOrder: string[]) {
+  // standingsOrder is an array of memberIds from best to worst
+  // We want reverse order for waivers (worst team = first priority)
+  const reversedOrder = [...standingsOrder].reverse();
+
+  for (let i = 0; i < reversedOrder.length; i++) {
+    await db
+      .update(waiverOrder)
+      .set({ position: i + 1 })
+      .where(
+        and(
+          eq(waiverOrder.leagueId, leagueId),
+          eq(waiverOrder.memberId, reversedOrder[i])
+        )
+      );
+  }
 }
 

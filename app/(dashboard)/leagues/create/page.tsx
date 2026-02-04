@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { DEFAULT_LEAGUE_SETTINGS } from "@/lib/league-settings";
+import { DEFAULT_LEAGUE_SETTINGS, MOCK_LEAGUE_SETTINGS, WaiverType } from "@/lib/league-settings";
 
 interface BotTeam {
   id: string;
@@ -30,6 +30,18 @@ export default function CreateLeaguePage() {
   // Maximum bots is numberOfTeams - 1 (need at least 1 human)
   const maxBots = numberOfTeams - 1;
   const canAddBot = botTeams.length < maxBots;
+
+  // Handle mock league toggle - mock leagues don't have waivers
+  function handleMockToggle(checked: boolean) {
+    setIsMock(checked);
+    if (checked) {
+      // Mock leagues: no waivers
+      setSettings(prev => ({ ...prev, waiverType: "none" as WaiverType, faabBudget: null }));
+    } else {
+      // Regular leagues: default to standard waivers
+      setSettings(prev => ({ ...prev, waiverType: "standard" as WaiverType, faabBudget: null }));
+    }
+  }
 
   async function handleSubmit(formData: FormData) {
     setIsLoading(true);
@@ -126,7 +138,7 @@ export default function CreateLeaguePage() {
                   type="checkbox"
                   id="isMock"
                   checked={isMock}
-                  onChange={(e) => setIsMock(e.target.checked)}
+                  onChange={(e) => handleMockToggle(e.target.checked)}
                   disabled={isLoading}
                   className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-600"
                 />
@@ -137,7 +149,7 @@ export default function CreateLeaguePage() {
               <p className="text-xs text-purple-700 ml-7">
                 Mock leagues use randomly generated stats instead of real NFL data.
                 Perfect for testing strategies or playing during the off-season.
-                The commissioner can advance weeks manually.
+                No waivers — all players are free agents with instant pickups.
               </p>
             </div>
 
@@ -279,6 +291,66 @@ export default function CreateLeaguePage() {
                     </div>
                   )}
                 </div>
+
+                {/* Waiver Settings - Only for non-mock leagues */}
+                {!isMock && (
+                  <div className="space-y-3">
+                    <Label className="text-base">Waiver System</Label>
+                    <div className="space-y-2">
+                      <select
+                        id="waiverType"
+                        name="waiverType"
+                        value={settings.waiverType}
+                        onChange={(e) => {
+                          const newType = e.target.value as WaiverType;
+                          updateSetting("waiverType", newType);
+                          // Reset FAAB budget if switching away from FAAB
+                          if (newType !== "faab") {
+                            updateSetting("faabBudget", null);
+                          } else {
+                            updateSetting("faabBudget", 100); // Default FAAB budget
+                          }
+                        }}
+                        disabled={isLoading}
+                        className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="standard">Standard Waivers (reverse standings priority)</option>
+                        <option value="faab">FAAB (Free Agent Acquisition Budget)</option>
+                      </select>
+                      <input type="hidden" name="waiverType" value={settings.waiverType} />
+                    </div>
+
+                    {settings.waiverType === "standard" && (
+                      <p className="text-xs text-gray-500">
+                        Waiver priority is based on reverse standings — last place gets first priority.
+                        After a successful claim, that team moves to the back of the waiver order.
+                      </p>
+                    )}
+
+                    {settings.waiverType === "faab" && (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="faabBudget">Season Budget ($)</Label>
+                          <Input
+                            id="faabBudget"
+                            name="faabBudget"
+                            type="number"
+                            min={50}
+                            max={1000}
+                            value={settings.faabBudget ?? 100}
+                            onChange={(e) => updateSetting("faabBudget", Number(e.target.value))}
+                            disabled={isLoading}
+                            className="h-10"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Each team gets ${settings.faabBudget ?? 100} to bid on waiver players all season.
+                          Highest bid wins. Ties broken by reverse standings. Teams can bid $0.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

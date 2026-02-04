@@ -66,6 +66,11 @@ export const leagueSettings = pgTable("league_settings", {
     .default(true),
   tradeDeadlineWeek: integer("trade_deadline_week"),
   draftTimerSeconds: integer("draft_timer_seconds").notNull().default(120),
+  // Waiver settings
+  waiverType: text("waiver_type", {
+    enum: ["none", "standard", "faab"],
+  }).notNull().default("standard"),
+  faabBudget: integer("faab_budget"), // Only used when waiverType is "faab"
   createdAt: timestamp("created_at")
     .notNull()
     .defaultNow(),
@@ -154,7 +159,7 @@ export const rosterPlayers = pgTable("roster_players", {
     .notNull()
     .references(() => players.id),
   slot: text("slot").notNull(),
-  acquiredVia: text("acquired_via", { enum: ["draft", "free_agent", "trade"] })
+  acquiredVia: text("acquired_via", { enum: ["draft", "free_agent", "trade", "waiver"] })
     .notNull()
     .default("draft"),
   acquiredAt: timestamp("acquired_at")
@@ -260,7 +265,7 @@ export const leagueActivity = pgTable("league_activity", {
   leagueId: text("league_id")
     .notNull()
     .references(() => leagues.id),
-  type: text("type", { enum: ["trade_completed", "free_agent_pickup"] }).notNull(),
+  type: text("type", { enum: ["trade_completed", "free_agent_pickup", "waiver_claim", "player_dropped"] }).notNull(),
   payload: text("payload").notNull(),
   createdAt: timestamp("created_at")
     .notNull()
@@ -403,4 +408,108 @@ export const playerGameStats = pgTable("player_game_stats", {
 }, (table) => ({
   // Unique constraint to prevent duplicates
   playerGameUnique: unique().on(table.playerId, table.gameId),
+}));
+
+// ============================================================================
+// WAIVER SYSTEM TABLES
+// ============================================================================
+
+// Track players currently on waivers in a league
+export const waiverPlayers = pgTable("waiver_players", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  leagueId: text("league_id")
+    .notNull()
+    .references(() => leagues.id),
+  playerId: text("player_id")
+    .notNull()
+    .references(() => players.id),
+  // When the player was put on waivers
+  waiverStart: timestamp("waiver_start")
+    .notNull()
+    .defaultNow(),
+  // When the waiver period ends (after processing, player becomes free agent)
+  waiverEnd: timestamp("waiver_end"),
+  // Who dropped the player (null if never rostered)
+  droppedByMemberId: text("dropped_by_member_id")
+    .references(() => leagueMembers.id),
+  createdAt: timestamp("created_at")
+    .notNull()
+    .defaultNow(),
+}, (table) => ({
+  // A player can only be on waivers once per league at a time
+  leaguePlayerUnique: unique().on(table.leagueId, table.playerId),
+}));
+
+// Track waiver claims submitted by teams
+export const waiverClaims = pgTable("waiver_claims", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  leagueId: text("league_id")
+    .notNull()
+    .references(() => leagues.id),
+  memberId: text("member_id")
+    .notNull()
+    .references(() => leagueMembers.id),
+  playerId: text("player_id")
+    .notNull()
+    .references(() => players.id),
+  // For FAAB leagues
+  bidAmount: integer("bid_amount").default(0),
+  // Priority order (lower = higher priority, for standard waivers)
+  priority: integer("priority").notNull(),
+  // Player to drop if roster is full (optional)
+  dropPlayerId: text("drop_player_id")
+    .references(() => players.id),
+  status: text("status", { enum: ["pending", "awarded", "outbid", "canceled"] })
+    .notNull()
+    .default("pending"),
+  // When the claim was processed
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at")
+    .notNull()
+    .defaultNow(),
+});
+
+// Track FAAB budgets for each team
+export const faabBalances = pgTable("faab_balances", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  leagueId: text("league_id")
+    .notNull()
+    .references(() => leagues.id),
+  memberId: text("member_id")
+    .notNull()
+    .references(() => leagueMembers.id),
+  // Remaining budget
+  balance: integer("balance").notNull(),
+  // Initial budget (for reference)
+  initialBudget: integer("initial_budget").notNull(),
+  createdAt: timestamp("created_at")
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+}, (table) => ({
+  // One balance per member per league
+  leagueMemberUnique: unique().on(table.leagueId, table.memberId),
+}));
+
+// Track waiver order for standard waiver leagues (reverse standings)
+export const waiverOrder = pgTable("waiver_order", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  leagueId: text("league_id")
+    .notNull()
+    .references(() => leagues.id),
+  memberId: text("member_id")
+    .notNull()
+    .references(() => leagueMembers.id),
+  // Position in waiver order (1 = first priority)
+  position: integer("position").notNull(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+}, (table) => ({
+  // One position per member per league
+  leagueMemberUnique: unique().on(table.leagueId, table.memberId),
 }));

@@ -14,6 +14,9 @@ export const leagueSettingsSchema = z.object({
   tradesEnabled: z.boolean(),
   tradeDeadlineWeek: z.number().int().min(1).max(17).nullable(),
   draftTimerSeconds: z.number().int().min(30).max(600),
+  // Waiver settings
+  waiverType: z.enum(["none", "standard", "faab"]),
+  faabBudget: z.number().int().min(50).max(1000).nullable(),
 });
 
 export type LeagueSettingsFormData = z.infer<typeof leagueSettingsSchema>;

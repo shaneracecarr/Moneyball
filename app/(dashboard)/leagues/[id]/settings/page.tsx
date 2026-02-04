@@ -77,6 +77,7 @@ export default async function LeagueSettingsPage({ params }: { params: { id: str
         settings={settingsResult.settings}
         isCommissioner={isCommissioner}
         locked={settingsResult.locked ?? false}
+        isMock={league.isMock ?? false}
       />
     </div>
   );

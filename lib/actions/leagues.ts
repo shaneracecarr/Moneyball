@@ -16,7 +16,7 @@ import {
 } from "@/lib/db/queries";
 import { redirect } from "next/navigation";
 import { generateInviteCode } from "@/lib/utils";
-import { DEFAULT_LEAGUE_SETTINGS } from "@/lib/league-settings";
+import { DEFAULT_LEAGUE_SETTINGS, MOCK_LEAGUE_SETTINGS, WaiverType } from "@/lib/league-settings";
 import { leagueSettingsSchema } from "@/lib/validations/settings";
 
 // Interface for bot team configuration
@@ -91,6 +91,28 @@ export async function createLeagueAction(formData: FormData) {
       );
     }
 
+    // Determine waiver settings based on league type
+    // Mock leagues: no waivers (free agency only)
+    // Regular leagues: user can choose standard or FAAB
+    let waiverType: WaiverType = "standard";
+    let faabBudget: number | null = null;
+
+    if (isMock) {
+      // Mock leagues have no waivers
+      waiverType = "none";
+      faabBudget = null;
+    } else {
+      // Regular leagues: get waiver settings from form
+      const formWaiverType = formData.get("waiverType") as string;
+      if (formWaiverType === "faab") {
+        waiverType = "faab";
+        faabBudget = Number(formData.get("faabBudget")) || 100;
+      } else {
+        waiverType = "standard";
+        faabBudget = null;
+      }
+    }
+
     // Save league settings
     const settingsData = {
       qbCount: Number(formData.get("qbCount")) || DEFAULT_LEAGUE_SETTINGS.qbCount,
@@ -105,14 +127,16 @@ export async function createLeagueAction(formData: FormData) {
       scoringFormat: (formData.get("scoringFormat") as "standard" | "half_ppr" | "ppr") || DEFAULT_LEAGUE_SETTINGS.scoringFormat,
       tradesEnabled: formData.get("tradesEnabled") !== "false",
       tradeDeadlineWeek: formData.get("tradeDeadlineWeek") ? Number(formData.get("tradeDeadlineWeek")) : null,
+      waiverType,
+      faabBudget,
     };
 
     try {
       const validatedSettings = leagueSettingsSchema.parse(settingsData);
       await upsertLeagueSettings(league.id, validatedSettings);
     } catch {
-      // If settings validation fails, save defaults
-      await upsertLeagueSettings(league.id, DEFAULT_LEAGUE_SETTINGS);
+      // If settings validation fails, save defaults based on league type
+      await upsertLeagueSettings(league.id, isMock ? MOCK_LEAGUE_SETTINGS : DEFAULT_LEAGUE_SETTINGS);
     }
   } catch (error) {
     if (error instanceof Error) {
