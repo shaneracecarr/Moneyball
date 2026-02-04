@@ -2,8 +2,8 @@
 
 import { db } from "@/lib/db/index";
 import { players } from "@/lib/db/schema";
-import { asc } from "drizzle-orm";
-import { inArray } from "drizzle-orm";
+import { asc, sql } from "drizzle-orm";
+import { inArray, isNotNull } from "drizzle-orm";
 
 const MOCK_DRAFT_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
@@ -14,10 +14,16 @@ export async function getAllPlayersAction() {
       fullName: players.fullName,
       position: players.position,
       team: players.team,
+      adp: players.adp,
     })
     .from(players)
     .where(inArray(players.position, MOCK_DRAFT_POSITIONS))
-    .orderBy(asc(players.fullName));
+    .orderBy(
+      // Sort by ADP (nulls last), then by name as fallback
+      sql`CASE WHEN ${players.adp} IS NULL THEN 1 ELSE 0 END`,
+      asc(players.adp),
+      asc(players.fullName)
+    );
 
   return { players: allPlayers };
 }
