@@ -16,7 +16,7 @@ Moneyball is a fantasy football league management application built with Next.js
 - **UI Components**: shadcn-style components with CVA (class-variance-authority), Radix UI primitives
 - **Validation**: Zod schemas for forms and data
 - **Password Security**: bcryptjs for hashing
-- **Player Data**: Synced from Sleeper API (`https://api.sleeper.app/v1/players/nfl`)
+- **Player Data**: RapidAPI Tank01 NFL API (player info, stats, ADP, historical game logs)
 
 ## Project Structure
 
@@ -47,9 +47,10 @@ app/
       [id]/chat/page.tsx            # League chat
   api/
     auth/[...nextauth]/route.ts     # NextAuth API route
-    players/sync/route.ts           # POST: sync players from Sleeper API
-    players/import-fantasy/route.ts # POST: import fantasy projections
-    players/import-stats/route.ts   # POST: import player stats
+    players/import-fantasy/route.ts # POST: import fantasy players from RapidAPI (QB, RB, WR, TE, K, DEF)
+    players/import-adp/route.ts     # POST: import ADP (Average Draft Position) data
+    players/import-stats/route.ts   # POST: import full player stats from team rosters
+    players/import-history/route.ts # POST: import 3 years of historical game-by-game stats (batched)
 
 components/
   ui/           # button, input, card, label (shadcn-style)
@@ -63,7 +64,7 @@ components/
   matchup/      # matchup-view
   trades/       # trade components
   chat/         # chat components
-  player-card/  # player-name-link, player-card-dialog
+  player-card/  # player-name-link, player-card-dialog, player-card-modal (dark theme with game logs)
   home/         # hero
 
 lib/
@@ -97,6 +98,7 @@ lib/
   roster-config.ts    # SlotConfig interface and generateSlotConfig() for dynamic roster slots
   draft-utils.ts      # getSnakeDraftPosition, getMemberIdForPick
   scoring-utils.ts    # generatePlayerScore, calculateTeamScore (for league scoring)
+  design-system.ts    # Dark theme color tokens, position colors, reusable Tailwind patterns
   utils.ts            # cn() (classname merge), generateInviteCode()
 
 types/
@@ -130,7 +132,8 @@ Tables defined in `lib/db/schema.ts`:
 | `drafts` | Draft instances (status: scheduled/in_progress/completed, round count, current pick) |
 | `draft_order` | Randomized pick order per draft |
 | `draft_picks` | Individual picks made during a draft |
-| `players` | NFL player database (synced from Sleeper API, keyed by sleeperId, includes ADP) |
+| `players` | NFL player database (from RapidAPI, keyed by sleeperId, includes ADP, rapidApiId) |
+| `player_game_stats` | Historical game-by-game stats (3 years: 2022-2024, passing/rushing/receiving/kicking/fantasy points) |
 | `roster_players` | Players on team rosters with slot assignments |
 | `matchups` | Weekly matchups between teams |
 | `trades` | Trade proposals between league members |
@@ -220,11 +223,46 @@ leagueMembers = pgTable("league_members", {
 - `roster.ts` actions fetch league settings and generate slot config dynamically for all validation
 - `team-roster-page.tsx` and `roster-section.tsx` receive slot config as props from the server component
 
-### Player Data
-- Players synced via POST to `/api/players/sync` (requires auth)
-- Fetches from Sleeper API, filters to positions: QB, RB, WR, TE, K, DEF
-- Upserts by `sleeperId` to avoid duplicates
-- Player records include: name, team, position, status, injuryStatus, age, experience, number, ADP, seasonPoints
+### Player Data & RapidAPI Integration
+
+Player data is sourced from the **RapidAPI Tank01 NFL API**. Environment variable `RAPIDAPI_KEY` must be set.
+
+#### Admin Import Buttons (`/admin`)
+1. **Import Fantasy Players** (`/api/players/import-fantasy`)
+   - Fetches all NFL players from `/getNFLPlayerList`
+   - Filters to fantasy positions: QB, RB, WR, TE, K (API uses "PK" for kickers, mapped to "K")
+   - Also imports 32 team defenses (DEF) from `/getNFLTeams`
+   - Upserts by `sleeperId` to avoid duplicates
+
+2. **Import ADP** (`/api/players/import-adp`)
+   - Fetches Average Draft Position from `/getNFLADP?adpType=halfPPR`
+   - Updates existing players with ADP values
+   - Adds any missing kickers found in ADP data
+
+3. **Import Full Player Stats** (`/api/players/import-stats`)
+   - Fetches detailed stats from all 32 team rosters
+   - Includes passing, rushing, receiving, and defensive stats
+
+4. **Import Historical Stats** (`/api/players/import-history`)
+   - Fetches 3 years (2022-2024) of game-by-game stats
+   - Runs in batches (25 players per batch) to avoid timeouts
+   - Stores in `player_game_stats` table with fantasy point calculations
+   - Only imports for active fantasy position players
+
+#### Player Record Fields
+- **Identity**: sleeperId, rapidApiId, fullName, firstName, lastName
+- **Team Info**: team, position, number, status
+- **Physical**: age, height, weight, college, yearsExp
+- **Fantasy**: adp, seasonPoints, headshotUrl, injuryStatus
+
+#### Historical Game Stats (`player_game_stats`)
+- **Game Info**: gameId, season, week, opponent, isHome, gameDate
+- **Passing**: attempts, completions, yards, TDs, INTs, rating, QBR, sacked
+- **Rushing**: attempts, yards, TDs, long
+- **Receiving**: targets, receptions, yards, TDs, long
+- **Kicking**: FG made/attempted, XP made/attempted, long
+- **Defense**: tackles, sacks, INTs, fumbles forced/recovered, TDs
+- **Fantasy Points**: standard, PPR, half-PPR (pre-calculated)
 
 ### League System
 - Invite codes use ABC-1234 format with uniqueness checking
@@ -373,6 +411,31 @@ leagueMembers = pgTable("league_members", {
 - When active league selected, shows: League, Team, Matchup, Standings, Trades, Inbox, Chat
 - "My Teams" page (`/my-teams`) lists all user's leagues with roster fill counts and links to manage each team
 - League detail page has "My Team" button linking to `/leagues/[id]/team` and "Settings" button linking to `/leagues/[id]/settings`
+
+### Player Card Modal
+
+The player card modal (`components/player-card/player-card-modal.tsx`) displays detailed player information with historical stats. It uses the dark theme design system.
+
+**Features:**
+- **Wide layout** (max-w-4xl) with dark theme (#1a1d24 base)
+- **Large player portrait** (w-28 h-28) with position-colored border
+- **Info bar**: Age, Height, Weight, Experience, College, ADP
+- **Year selector tabs**: Switch between 2024, 2023, 2022 seasons
+- **Game log table**: Position-specific columns with weekly stats
+- **Season totals row**: Aggregated stats at bottom of table
+- **Missing data indicator**: Shows "X" for null values to identify data gaps
+
+**Position-Specific Columns:**
+- **QB**: Cmp, Att, Yds, TD, INT + rushing stats
+- **RB**: Car, RuYds, RuTD + receiving stats (Tgt, Rec, ReYds, ReTD)
+- **WR/TE**: Tgt, Rec, Yds, TD
+- **K**: FGM, FGA, XPM, XPA
+
+**Data Source:**
+- `getPlayerCardDataAction(playerId)` in `lib/actions/player-card.ts`
+- Fetches player info from `players` table
+- Fetches historical stats from `player_game_stats` table
+- Checks roster ownership in active league context
 
 ### UI Design
 - Blue/indigo color scheme (indigo-600 primary)
