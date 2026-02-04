@@ -256,28 +256,39 @@ export function DraftBoard({
 
   // Process bot picks automatically
   useEffect(() => {
+    // Only trigger if it's a bot's turn and we're not already processing
     if (
-      state.draft.status === "in_progress" &&
-      isBotTurn &&
-      !botPickProcessingRef.current &&
-      !isBotPicking
+      state.draft.status !== "in_progress" ||
+      !isBotTurn ||
+      botPickProcessingRef.current
     ) {
-      botPickProcessingRef.current = true;
-      setIsBotPicking(true);
+      return;
+    }
 
-      // Small delay so user can see it's the bot's turn
-      const timer = setTimeout(async () => {
+    // Mark as processing immediately to prevent duplicate triggers
+    botPickProcessingRef.current = true;
+    setIsBotPicking(true);
+
+    // Small delay so user can see it's the bot's turn
+    const timer = setTimeout(async () => {
+      try {
         const result = await processBotPicksAction(state.draft.id);
         if (!result.error) {
           await pollState();
         }
+      } finally {
         setIsBotPicking(false);
-        botPickProcessingRef.current = false;
-      }, 1000);
+        // Reset the ref AFTER state update to allow next bot pick
+        setTimeout(() => {
+          botPickProcessingRef.current = false;
+        }, 100);
+      }
+    }, 1000);
 
-      return () => clearTimeout(timer);
-    }
-  }, [state.draft.status, state.draft.id, isBotTurn, isBotPicking, pollState]);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [state.draft.status, state.draft.id, isBotTurn, pollState]);
 
   // Reset bot pick flag when pick changes
   useEffect(() => {
