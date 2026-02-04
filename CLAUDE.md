@@ -380,6 +380,114 @@ leagueMembers = pgTable("league_members", {
 - Responsive design with mobile-first approach
 - Gradient backgrounds on hero and auth pages
 
+### Dark Theme Design System (`lib/design-system.ts`)
+
+The player card modal established a premium dark theme style that should be used for other immersive UI components. The design system is documented in `lib/design-system.ts` with exportable constants and patterns.
+
+#### Color Palette
+```
+Background Layers (darkest → lightest):
+- bg.base:     #1a1d24  (deepest background, main surfaces)
+- bg.elevated: #1e2128  (raised surfaces, table rows, nav bars)
+- bg.card:     #252830  (card headers, prominent sections)
+- bg.overlay:  rgba(0,0,0,0.6)  (modal backdrops)
+
+Text Colors:
+- text.primary:   #ffffff (white - headings)
+- text.secondary: #9ca3af (gray-400 - labels)
+- text.muted:     #6b7280 (gray-500 - disabled)
+- text.accent:    #818cf8 (indigo-400 - links)
+
+Borders:
+- border.subtle:  #374151 (gray-700)
+- border.default: #4b5563 (gray-600)
+
+Semantic Colors:
+- success: #4ade80 (green-400) + rgba(34,197,94,0.2) bg
+- warning: #f97316 (orange-500)
+- error:   #f87171 (red-400) + rgba(239,68,68,0.2) bg
+- info:    #818cf8 (indigo-400) + rgba(99,102,241,0.2) bg
+```
+
+#### Position Colors
+Each position has consistent colors for badges, borders, and backgrounds:
+- **QB**: red-500 (#ef4444)
+- **RB**: green-500 (#22c55e)
+- **WR**: blue-500 (#3b82f6)
+- **TE**: orange-500 (#f97316)
+- **K**: purple-500 (#a855f7)
+- **DEF**: slate-600 (#475569)
+
+#### Key Component Patterns
+
+**Modal Structure:**
+```tsx
+<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+  <div className="bg-[#1a1d24] rounded-xl shadow-2xl overflow-hidden">
+    <div className="bg-[#252830] px-6 py-5">  {/* Header */}
+    <div className="bg-[#1a1d24] px-6 py-4">  {/* Body */}
+  </div>
+</div>
+```
+
+**Info Box Pattern** (small labeled value displays):
+```tsx
+<div className="text-center">
+  <p className="text-[10px] text-gray-400 uppercase tracking-wider">Label</p>
+  <p className="text-sm font-semibold text-white">Value</p>
+</div>
+```
+
+**Info Row** (horizontal info boxes with dividers):
+```tsx
+<div className="flex items-center gap-6 bg-[#1a1d24] rounded-lg px-4 py-3">
+  <InfoBox label="Age" value="28" />
+  <div className="w-px h-8 bg-gray-700" />  {/* Vertical divider */}
+  <InfoBox label="Exp" value="5 yr" />
+</div>
+```
+
+**Tab Buttons:**
+```tsx
+<button className={isActive
+  ? "bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium"
+  : "text-gray-400 hover:bg-gray-700 hover:text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+}>
+```
+
+**Badges:**
+```tsx
+// Success (free agent)
+<span className="text-sm font-medium text-green-400 bg-green-500/20 px-2 py-1 rounded">
+// Info (owned)
+<span className="text-sm font-medium text-indigo-400 bg-indigo-500/20 px-2 py-1 rounded">
+// Warning (injury)
+<span className="px-3 py-1 rounded-full text-sm font-semibold bg-orange-500 text-white">
+```
+
+**Table Styling:**
+```tsx
+<table className="w-full text-sm">
+  <thead className="text-gray-400 text-xs uppercase sticky top-0 bg-[#1a1d24]">
+  <tbody className="text-white">
+    <tr className="bg-[#1e2128]">  {/* Even rows */}
+    <tr className="bg-[#1a1d24]">  {/* Odd rows */}
+    <tr className="border-t border-gray-600 bg-[#252830] font-semibold">  {/* Totals row */}
+```
+
+#### When to Use Dark Theme
+- **Player cards** and detailed stat views
+- **Modals/dialogs** with lots of data
+- **Game logs** and historical data tables
+- **Draft boards** (immersive full-screen experiences)
+- **Matchup views** with head-to-head comparisons
+
+#### When to Use Light Theme (existing)
+- **Dashboard** and navigation
+- **Settings pages** and forms
+- **Simple lists** and league overviews
+- **Admin pages**
+
 ## Supabase + Vercel Connection (CRITICAL)
 
 This section documents the working configuration for connecting Next.js on Vercel to Supabase PostgreSQL.
