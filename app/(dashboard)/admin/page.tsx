@@ -19,6 +19,8 @@ type ImportResult = {
   synced?: number;
   skipped?: number;
   teamErrors?: number;
+  addedKickers?: number;
+  notFound?: number;
   message?: string;
   error?: string;
   details?: string;
@@ -104,6 +106,12 @@ function ImportButton({
                   )}
                   {result.skipped !== undefined && (
                     <p>Skipped: {result.skipped}</p>
+                  )}
+                  {result.addedKickers !== undefined && (
+                    <p>Added Kickers: {result.addedKickers}</p>
+                  )}
+                  {result.notFound !== undefined && (
+                    <p className="text-amber-700">Not Found: {result.notFound}</p>
                   )}
                   {result.teamErrors !== undefined && result.teamErrors > 0 && (
                     <p className="text-amber-700">
@@ -318,6 +326,13 @@ export default function AdminPage() {
           loadingLabel="Importing Fantasy Players..."
           endpoint="/api/players/import-fantasy"
           description="Pull fantasy-relevant players (QB, RB, WR, TE, K, DEF) from the NFL API and upsert them into the global players table. Safe to run multiple times."
+        />
+
+        <ImportButton
+          label="Import ADP (Average Draft Position)"
+          loadingLabel="Importing ADP Data..."
+          endpoint="/api/players/import-adp"
+          description="Pull ADP data from RapidAPI (half PPR format). Updates existing players with ADP values and adds any missing kickers to the database. Players will be sorted by ADP in drafts and player lists."
         />
 
         <ImportButton
