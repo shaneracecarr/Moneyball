@@ -125,11 +125,11 @@ Tables defined in `lib/db/schema.ts`:
 | `users` | User accounts (email, hashed password, name, isAdmin flag) |
 | `leagues` | Fantasy leagues (name, team count, invite code, currentWeek, phase) |
 | `league_settings` | Per-league configuration (roster slot counts, scoring format, trade rules) |
-| `league_members` | League membership with commissioner flag, team name, and isBot flag |
+| `league_members` | League membership (leagueId, userId, teamName, isCommissioner, isBot) |
 | `drafts` | Draft instances (status: scheduled/in_progress/completed, round count, current pick) |
 | `draft_order` | Randomized pick order per draft |
 | `draft_picks` | Individual picks made during a draft |
-| `players` | NFL player database (synced from Sleeper API, keyed by sleeperId) |
+| `players` | NFL player database (synced from Sleeper API, keyed by sleeperId, includes ADP) |
 | `roster_players` | Players on team rosters with slot assignments |
 | `matchups` | Weekly matchups between teams |
 | `trades` | Trade proposals between league members |
@@ -140,6 +140,23 @@ Tables defined in `lib/db/schema.ts`:
 | `chat_messages` | League chat/messaging |
 
 All tables use UUID primary keys and timestamp tracking.
+
+### Key Table: `league_members`
+
+```typescript
+leagueMembers = pgTable("league_members", {
+  id: text("id").primaryKey(),
+  leagueId: text("league_id").notNull().references(() => leagues.id),
+  userId: text("user_id").references(() => users.id),  // NULL for bots
+  teamName: text("team_name"),
+  isCommissioner: boolean("is_commissioner").notNull().default(false),
+  isBot: boolean("is_bot").notNull().default(false),   // TRUE for AI teams
+  joinedAt: timestamp("joined_at").notNull().defaultNow(),
+});
+```
+
+- **Human members**: `userId` is set, `isBot` is false
+- **Bot members**: `userId` is null, `isBot` is true, `teamName` is required
 
 ## Key Implementation Details
 
@@ -239,15 +256,31 @@ All tables use UUID primary keys and timestamp tracking.
 - **Strategy**: Bots pick the best available player by ADP (lowest ADP = best)
 - **Implementation**: `processBotPicksAction(draftId)` processes all consecutive bot picks in a loop
 - **Delay**: 1 second delay before each bot pick for visual feedback
-- **UI**: Draft board shows "BOT TURN" and "BOT PICKING..." status indicators
-- **Column headers**: Bot teams display purple "BOT" badge
+- **UI Indicators**:
+  - Draft board shows "BOT TURN" (purple text) when waiting for bot
+  - Shows "BOT PICKING..." (purple, animated) while bot is selecting
+  - Column headers display purple "BOT" badge for bot teams
+  - Bot teams have purple-tinted column headers
 
-#### Bot-Related Functions (`lib/actions/bot.ts` and `lib/actions/draft.ts`)
-- `getBestAvailablePlayerByAdp(draftId)` — Returns the highest-ranked available player
+#### Bot UI Components Updated
+- `app/(dashboard)/leagues/create/page.tsx` — "Add Bot" button and bot team name inputs
+- `app/(dashboard)/leagues/[id]/page.tsx` — Purple "Bot" badge in members list
+- `components/draft/draft-board.tsx` — Bot status indicators, auto-pick trigger, purple badges
+- `components/draft/draft-setup-card.tsx` — "Bot" indicator in draft order display
+- `components/trades/trade-list.tsx` — Updated types for nullable bot fields
+
+#### Bot-Related Database Queries (`lib/db/queries.ts`)
+- `getLeagueBotMembers(leagueId)` — Gets all bot members in a league
+- `getMemberById(memberId)` — Gets member info including `isBot` flag
+- `getBestAvailablePlayerByAdp(draftId, options?)` — Returns best undrafted player by ADP
+- `getMemberRosterWithAdp(memberId)` — Gets roster with player ADP for lineup optimization
+- `getTradeParticipants(tradeId)` — Updated to use leftJoin for users (supports bots with null userId)
+- `getDraftOrder(draftId)` — Updated to include `isBot` field
+- `getDraftPicks(draftId)` — Updated to include `isBot` field
+
+#### Bot-Related Server Actions (`lib/actions/bot.ts` and `lib/actions/draft.ts`)
 - `processBotPicksAction(draftId)` — Processes all consecutive bot picks during draft
 - `isCurrentPickBotAction(draftId)` — Checks if current pick is a bot's turn
-- `getMemberById(memberId)` — Gets member info including `isBot` flag
-- `getLeagueBotMembers(leagueId)` — Gets all bot members in a league
 - `setBotLineupAction(memberId, leagueId)` — Sets optimal lineup for one bot
 - `setAllBotLineupsAction(leagueId)` — Sets lineups for all bots in a league
 - `botFillRosterAction(memberId, leagueId)` — Fills empty roster slots for one bot
@@ -366,5 +399,25 @@ export const db = drizzle(client, { schema });
 - `queries.ts` uses `as any` casts in a few places to work around Drizzle's query builder types when applying conditional `.where()` clauses
 - The `.next` cache can become corrupted — if you see webpack module errors or "missing required error components", delete `.next` and restart the dev server (`rm -rf .next && npm run dev`)
 - When killing the dev server on Windows, use `taskkill //f //im node.exe` (double slashes for flags in Git Bash)
-- After modifying `lib/db/schema.ts`, always run `npx drizzle-kit push` to sync changes to the Supabase database
+- After modifying `lib/db/schema.ts`, sync changes to database using either:
+  - `npx drizzle-kit push` (requires DATABASE_URL env var)
+  - Supabase MCP `apply_migration` tool (preferred when using Claude Code)
 - The `matchup-view.tsx` component still uses hardcoded roster slots — it should be updated to use dynamic slot config if matchup scoring needs to respect custom roster configurations
+
+## Supabase MCP Integration
+
+When using Claude Code with the Supabase MCP tools, you can manage the database directly:
+
+```
+mcp__supabase__apply_migration    # Apply DDL changes (schema modifications)
+mcp__supabase__execute_sql        # Run queries (SELECT, INSERT, UPDATE, DELETE)
+mcp__supabase__list_tables        # View existing tables
+mcp__supabase__list_migrations    # View migration history
+mcp__supabase__get_logs           # Debug issues with logs
+```
+
+Example migration for adding a column:
+```sql
+ALTER TABLE league_members
+ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT false;
+```
