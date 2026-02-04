@@ -13,6 +13,7 @@ import {
 } from "@/lib/db/queries";
 import { generateSlotConfig } from "@/lib/roster-config";
 import { calculateTeamScore } from "@/lib/scoring-utils";
+import { setAllBotLineupsAction, fillAllBotRostersAction } from "./bot";
 
 export async function startWeekAction(leagueId: string) {
   try {
@@ -30,6 +31,9 @@ export async function startWeekAction(leagueId: string) {
     if (league.phase !== "pre_week") {
       return { error: "League is not in pre-week phase" };
     }
+
+    // Set bot lineups before the week locks
+    await setAllBotLineupsAction(leagueId);
 
     await updateLeaguePhase(leagueId, "week_active");
 
@@ -103,6 +107,9 @@ export async function advanceWeekAction(leagueId: string) {
       await updateLeagueWeekAndPhase(leagueId, 18, "complete");
     } else {
       await updateLeagueWeekAndPhase(leagueId, league.currentWeek + 1, "pre_week");
+
+      // Fill any empty bot roster slots with free agents
+      await fillAllBotRostersAction(leagueId);
     }
 
     return { success: true, results, week: league.currentWeek };

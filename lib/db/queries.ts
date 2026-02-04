@@ -36,11 +36,12 @@ export async function createLeagueMember(
   leagueId: string,
   userId: string | null,
   teamName: string | null,
-  isCommissioner: boolean
+  isCommissioner: boolean,
+  isBot: boolean = false
 ) {
   const result = await db
     .insert(leagueMembers)
-    .values({ leagueId, userId, teamName, isCommissioner })
+    .values({ leagueId, userId, teamName, isCommissioner, isBot })
     .returning();
   return result[0];
 }
@@ -87,6 +88,7 @@ export async function getLeagueMembers(leagueId: string) {
       userEmail: users.email,
       teamName: leagueMembers.teamName,
       isCommissioner: leagueMembers.isCommissioner,
+      isBot: leagueMembers.isBot,
       joinedAt: leagueMembers.joinedAt,
     })
     .from(leagueMembers)
@@ -343,6 +345,7 @@ export async function getDraftOrder(draftId: string) {
       position: draftOrder.position,
       userId: leagueMembers.userId,
       teamName: leagueMembers.teamName,
+      isBot: leagueMembers.isBot,
       userName: users.name,
       userEmail: users.email,
     })
@@ -384,6 +387,7 @@ export async function getDraftPicks(draftId: string) {
       userName: users.name,
       userEmail: users.email,
       teamName: leagueMembers.teamName,
+      isBot: leagueMembers.isBot,
     })
     .from(draftPicks)
     .innerJoin(players, eq(draftPicks.playerId, players.id))
@@ -778,10 +782,11 @@ export async function getTradeParticipants(tradeId: string) {
       userName: users.name,
       userEmail: users.email,
       userId: leagueMembers.userId,
+      isBot: leagueMembers.isBot,
     })
     .from(tradeParticipants)
     .innerJoin(leagueMembers, eq(tradeParticipants.memberId, leagueMembers.id))
-    .innerJoin(users, eq(leagueMembers.userId, users.id))
+    .leftJoin(users, eq(leagueMembers.userId, users.id))
     .where(eq(tradeParticipants.tradeId, tradeId));
 }
 
@@ -1091,5 +1096,73 @@ export async function updateLeagueWeekAndPhase(
     .update(leagues)
     .set({ currentWeek: week, phase })
     .where(eq(leagues.id, leagueId));
+}
+
+// Bot-related queries
+
+export async function getLeagueBotMembers(leagueId: string) {
+  const result = await db
+    .select({
+      id: leagueMembers.id,
+      teamName: leagueMembers.teamName,
+      isBot: leagueMembers.isBot,
+    })
+    .from(leagueMembers)
+    .where(and(eq(leagueMembers.leagueId, leagueId), eq(leagueMembers.isBot, true)));
+  return result;
+}
+
+export async function getMemberById(memberId: string) {
+  const result = await db
+    .select({
+      id: leagueMembers.id,
+      leagueId: leagueMembers.leagueId,
+      userId: leagueMembers.userId,
+      teamName: leagueMembers.teamName,
+      isCommissioner: leagueMembers.isCommissioner,
+      isBot: leagueMembers.isBot,
+    })
+    .from(leagueMembers)
+    .where(eq(leagueMembers.id, memberId))
+    .limit(1);
+  return result[0] || null;
+}
+
+export async function getBestAvailablePlayerByAdp(
+  draftId: string,
+  options?: { position?: string }
+) {
+  // Get IDs of already-drafted players
+  const draftedPlayers = await db
+    .select({ playerId: draftPicks.playerId })
+    .from(draftPicks)
+    .where(eq(draftPicks.draftId, draftId));
+  const draftedIds = draftedPlayers.map((p) => p.playerId);
+
+  const conditions = [];
+  if (draftedIds.length > 0) {
+    conditions.push(notInArray(players.id, draftedIds));
+  }
+  if (options?.position) {
+    conditions.push(eq(players.position, options.position));
+  }
+  // Only consider players with a team (active players)
+  conditions.push(isNotNull(players.team));
+
+  let query = db.select().from(players);
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions)) as any;
+  }
+
+  // Sort by ADP ascending (best ADP = lowest number), nulls last
+  const result = await query
+    .orderBy(
+      sql`CASE WHEN ${players.adp} IS NULL THEN 1 ELSE 0 END`,
+      asc(players.adp),
+      asc(players.fullName)
+    )
+    .limit(1);
+
+  return result[0] || null;
 }
 

@@ -9,19 +9,33 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link";
 import { DEFAULT_LEAGUE_SETTINGS } from "@/lib/league-settings";
 
+interface BotTeam {
+  id: string;
+  name: string;
+}
+
 export default function CreateLeaguePage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState(DEFAULT_LEAGUE_SETTINGS);
+  const [numberOfTeams, setNumberOfTeams] = useState(12);
+  const [botTeams, setBotTeams] = useState<BotTeam[]>([]);
 
   const totalStarters = settings.qbCount + settings.rbCount + settings.wrCount +
     settings.teCount + settings.flexCount + settings.kCount + settings.defCount;
   const totalRoster = totalStarters + settings.benchCount + settings.irCount;
 
+  // Maximum bots is numberOfTeams - 1 (need at least 1 human)
+  const maxBots = numberOfTeams - 1;
+  const canAddBot = botTeams.length < maxBots;
+
   async function handleSubmit(formData: FormData) {
     setIsLoading(true);
     setError(null);
+
+    // Add bot teams to form data
+    formData.set("botTeams", JSON.stringify(botTeams.map(b => ({ name: b.name }))));
 
     const result = await createLeagueAction(formData);
 
@@ -33,6 +47,31 @@ export default function CreateLeaguePage() {
 
   function updateSetting(key: keyof typeof settings, value: number | string | boolean | null) {
     setSettings((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function addBotTeam() {
+    if (!canAddBot) return;
+    const newBot: BotTeam = {
+      id: crypto.randomUUID(),
+      name: `Bot ${botTeams.length + 1}`,
+    };
+    setBotTeams([...botTeams, newBot]);
+  }
+
+  function removeBotTeam(id: string) {
+    setBotTeams(botTeams.filter((b) => b.id !== id));
+  }
+
+  function updateBotName(id: string, name: string) {
+    setBotTeams(botTeams.map((b) => (b.id === id ? { ...b, name } : b)));
+  }
+
+  function handleNumberOfTeamsChange(value: number) {
+    setNumberOfTeams(value);
+    // If we have more bots than allowed, trim them
+    if (botTeams.length >= value) {
+      setBotTeams(botTeams.slice(0, value - 1));
+    }
   }
 
   return (
@@ -65,14 +104,65 @@ export default function CreateLeaguePage() {
                 name="numberOfTeams"
                 required
                 disabled={isLoading}
+                value={numberOfTeams}
+                onChange={(e) => handleNumberOfTeamsChange(Number(e.target.value))}
                 className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="8">8 Teams</option>
                 <option value="10">10 Teams</option>
-                <option value="12" defaultValue="12">12 Teams</option>
+                <option value="12">12 Teams</option>
                 <option value="14">14 Teams</option>
                 <option value="16">16 Teams</option>
               </select>
+            </div>
+
+            {/* Bot Teams Section */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Bot Teams</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addBotTeam}
+                  disabled={isLoading || !canAddBot}
+                >
+                  + Add Bot
+                </Button>
+              </div>
+              {botTeams.length > 0 ? (
+                <div className="space-y-2">
+                  {botTeams.map((bot, index) => (
+                    <div key={bot.id} className="flex items-center gap-2">
+                      <Input
+                        type="text"
+                        value={bot.name}
+                        onChange={(e) => updateBotName(bot.id, e.target.value)}
+                        placeholder={`Bot ${index + 1}`}
+                        disabled={isLoading}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeBotTeam(bot.id)}
+                        disabled={isLoading}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                  <p className="text-xs text-gray-500">
+                    {botTeams.length} bot{botTeams.length !== 1 ? "s" : ""} + 1 human (you) = {botTeams.length + 1} filled, {numberOfTeams - botTeams.length - 1} slots open for other players
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  No bot teams added. Bots auto-draft based on ADP and manage their lineups automatically.
+                </p>
+              )}
             </div>
 
             {/* Toggle Settings */}

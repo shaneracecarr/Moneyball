@@ -154,20 +154,29 @@ export default async function LeagueDetailPage({ params }: { params: { id: strin
                 >
                   <div>
                     <p className="font-medium">
-                      {member.userName || member.userEmail}
+                      {member.isBot
+                        ? member.teamName || "Bot"
+                        : member.userName || member.userEmail}
                       {member.userId === session.user.id && (
                         <span className="text-sm text-gray-500 ml-2">(You)</span>
                       )}
                     </p>
-                    {member.teamName && (
+                    {!member.isBot && member.teamName && (
                       <p className="text-sm text-gray-500">Team: {member.teamName}</p>
                     )}
                   </div>
-                  {member.isCommissioner && (
-                    <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
-                      Commissioner
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {member.isBot && (
+                      <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                        Bot
+                      </span>
+                    )}
+                    {member.isCommissioner && (
+                      <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
+                        Commissioner
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
 
@@ -198,6 +207,7 @@ export default async function LeagueDetailPage({ params }: { params: { id: strin
             userName: o.userName,
             userEmail: o.userEmail,
             teamName: o.teamName,
+            isBot: o.isBot ?? false,
           }))}
           leagueFull={leagueFull}
         />

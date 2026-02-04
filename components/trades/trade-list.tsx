@@ -13,7 +13,8 @@ type Participant = {
   decision: string;
   teamName: string | null;
   userName: string | null;
-  userEmail: string;
+  userEmail: string | null;
+  isBot?: boolean;
 };
 
 type TradeItem = {

@@ -19,6 +19,8 @@ import {
   searchAvailablePlayers,
   populateRosterFromDraft,
   updateLeaguePhase,
+  getMemberById,
+  getBestAvailablePlayerByAdp,
 } from "@/lib/db/queries";
 import { getSnakeDraftPosition, getMemberIdForPick } from "@/lib/draft-utils";
 
@@ -338,4 +340,123 @@ async function getDraftByLeagueId_internal(draftId: string) {
     .where(eq(draftsTable.id, draftId))
     .limit(1);
   return result[0];
+}
+
+// Bot draft functions
+
+/**
+ * Check if the current pick belongs to a bot and make the pick if so.
+ * Returns info about what happened.
+ */
+export async function processBotPicksAction(draftId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { error: "You must be logged in" };
+
+    let picksProcessed = 0;
+    let lastPickedPlayer: { name: string; position: string } | null = null;
+    let draftComplete = false;
+
+    // Process bot picks in a loop until it's a human's turn or draft is done
+    while (true) {
+      const draft = await getDraftByLeagueId_internal(draftId);
+      if (!draft) return { error: "Draft not found" };
+      if (draft.status !== "in_progress") {
+        draftComplete = draft.status === "completed";
+        break;
+      }
+
+      const league = await getLeagueById(draft.leagueId);
+      if (!league) return { error: "League not found" };
+
+      // Verify caller is in the league
+      const isMember = await isUserInLeague(session.user.id, draft.leagueId);
+      if (!isMember) return { error: "You are not a member of this league" };
+
+      // Find who is on the clock
+      const order = await getDraftOrder(draft.id);
+      const onTheClockMemberId = getMemberIdForPick(
+        draft.currentPick,
+        league.numberOfTeams,
+        order
+      );
+      if (!onTheClockMemberId) return { error: "Could not determine on-the-clock member" };
+
+      // Check if current picker is a bot
+      const member = await getMemberById(onTheClockMemberId);
+      if (!member || !member.isBot) {
+        // Not a bot's turn, stop processing
+        break;
+      }
+
+      // Bot's turn - pick best available by ADP
+      const bestPlayer = await getBestAvailablePlayerByAdp(draft.id);
+      if (!bestPlayer) {
+        return { error: "No available players for bot to draft" };
+      }
+
+      // Make the pick
+      const { round } = getSnakeDraftPosition(draft.currentPick, league.numberOfTeams);
+      await createDraftPick(
+        draft.id,
+        bestPlayer.id,
+        onTheClockMemberId,
+        draft.currentPick,
+        round
+      );
+
+      picksProcessed++;
+      lastPickedPlayer = { name: bestPlayer.fullName, position: bestPlayer.position };
+
+      // Check if draft is complete
+      const totalPicks = draft.numberOfRounds * league.numberOfTeams;
+      if (draft.currentPick >= totalPicks) {
+        await updateDraftStatus(draft.id, "completed", { completedAt: new Date() });
+        await populateRosterFromDraft(draft.id);
+        await updateLeaguePhase(league.id, "setup");
+        draftComplete = true;
+        break;
+      } else {
+        await advanceDraftPick(draft.id, draft.currentPick + 1);
+      }
+    }
+
+    return {
+      success: true,
+      picksProcessed,
+      lastPickedPlayer,
+      draftComplete,
+    };
+  } catch (error) {
+    if (error instanceof Error) return { error: error.message };
+    return { error: "Failed to process bot picks" };
+  }
+}
+
+/**
+ * Check if the current pick is a bot's turn
+ */
+export async function isCurrentPickBotAction(draftId: string) {
+  try {
+    const draft = await getDraftByLeagueId_internal(draftId);
+    if (!draft || draft.status !== "in_progress") {
+      return { isBot: false };
+    }
+
+    const league = await getLeagueById(draft.leagueId);
+    if (!league) return { isBot: false };
+
+    const order = await getDraftOrder(draft.id);
+    const onTheClockMemberId = getMemberIdForPick(
+      draft.currentPick,
+      league.numberOfTeams,
+      order
+    );
+    if (!onTheClockMemberId) return { isBot: false };
+
+    const member = await getMemberById(onTheClockMemberId);
+    return { isBot: member?.isBot ?? false };
+  } catch {
+    return { isBot: false };
+  }
 }

@@ -19,6 +19,11 @@ import { generateInviteCode } from "@/lib/utils";
 import { DEFAULT_LEAGUE_SETTINGS } from "@/lib/league-settings";
 import { leagueSettingsSchema } from "@/lib/validations/settings";
 
+// Interface for bot team configuration
+interface BotTeam {
+  name: string;
+}
+
 export async function createLeagueAction(formData: FormData) {
   try {
     const session = await auth();
@@ -32,6 +37,22 @@ export async function createLeagueAction(formData: FormData) {
     };
 
     const validatedData = createLeagueSchema.parse(rawData);
+
+    // Parse bot teams from form data
+    const botTeamsJson = formData.get("botTeams") as string;
+    let botTeams: BotTeam[] = [];
+    if (botTeamsJson) {
+      try {
+        botTeams = JSON.parse(botTeamsJson);
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+
+    // Validate bot count doesn't exceed team limit (must leave at least 1 slot for creator)
+    if (botTeams.length >= validatedData.numberOfTeams) {
+      return { error: `Cannot have ${botTeams.length} bots with only ${validatedData.numberOfTeams} teams (need at least 1 human)` };
+    }
 
     // Generate unique invite code
     let inviteCode = generateInviteCode();
@@ -53,7 +74,18 @@ export async function createLeagueAction(formData: FormData) {
     );
 
     // Add creator as commissioner
-    await createLeagueMember(league.id, session.user.id, null, true);
+    await createLeagueMember(league.id, session.user.id, null, true, false);
+
+    // Add bot teams
+    for (const bot of botTeams) {
+      await createLeagueMember(
+        league.id,
+        null, // No user ID for bots
+        bot.name || "Bot",
+        false, // Not commissioner
+        true // Is bot
+      );
+    }
 
     // Save league settings
     const settingsData = {

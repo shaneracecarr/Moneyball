@@ -83,6 +83,9 @@ export const leagueMembers = pgTable("league_members", {
   isCommissioner: boolean("is_commissioner")
     .notNull()
     .default(false),
+  isBot: boolean("is_bot")
+    .notNull()
+    .default(false),
   joinedAt: timestamp("joined_at")
     .notNull()
     .defaultNow(),

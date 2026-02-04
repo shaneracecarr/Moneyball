@@ -43,7 +43,8 @@ export default async function DraftPage({ params }: { params: { id: string } }) 
       id: o.memberId,
       teamName: o.teamName,
       userName: o.userName || o.userEmail,
-      userId: null as string | null,
+      userId: o.userId,
+      isBot: o.isBot ?? false,
     }));
 
   return (

@@ -23,6 +23,7 @@ import {
   createLeagueActivityEvent,
   insertSystemChatMessage,
 } from "@/lib/db/queries";
+import { processBotTradeResponsesAction } from "./bot";
 
 async function getMemberForUser(userId: string, leagueId: string) {
   const members = await getLeagueMembers(leagueId);
@@ -156,6 +157,9 @@ export async function createTradeAction(
         toMemberId: item.toMemberId,
       }))
     );
+
+    // Process any bot recipients immediately
+    await processBotTradeResponsesAction(trade.id);
 
     return { success: true, tradeId: trade.id };
   } catch (error) {

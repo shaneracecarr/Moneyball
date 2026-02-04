@@ -9,6 +9,7 @@ import {
   makePickAction,
   searchAvailablePlayersAction,
   autoPickAction,
+  processBotPicksAction,
 } from "@/lib/actions/draft";
 import { getSnakeDraftPosition } from "@/lib/draft-utils";
 
@@ -27,6 +28,7 @@ type Member = {
   teamName: string | null;
   userName: string | null;
   userId: string | null;
+  isBot: boolean;
 };
 
 type AvailablePlayer = {
@@ -122,8 +124,10 @@ export function DraftBoard({
   const [error, setError] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState(draftTimerSeconds);
   const [isAutoPicking, setIsAutoPicking] = useState(false);
+  const [isBotPicking, setIsBotPicking] = useState(false);
   const lastPickRef = useRef(initialState.draft.currentPick);
   const autoPickFiredRef = useRef(false);
+  const botPickProcessingRef = useRef(false);
   const gridRef = useRef<HTMLDivElement>(null);
 
   const numberOfTeams = state.numberOfTeams;
@@ -139,6 +143,8 @@ export function DraftBoard({
   const onClockEntry = state.order.find(
     (o) => o.memberId === state.onTheClockMemberId
   );
+  const onClockMember = members.find((m) => m.id === state.onTheClockMemberId);
+  const isBotTurn = onClockMember?.isBot ?? false;
   const onClockName =
     onClockEntry?.teamName || onClockEntry?.userName || onClockEntry?.userEmail || "Unknown";
 
@@ -233,7 +239,8 @@ export function DraftBoard({
       state.draft.status === "in_progress" &&
       !autoPickFiredRef.current &&
       !isAutoPicking &&
-      !isPicking
+      !isPicking &&
+      !isBotTurn // Don't auto-pick for bots, they have their own logic
     ) {
       autoPickFiredRef.current = true;
       setIsAutoPicking(true);
@@ -245,7 +252,39 @@ export function DraftBoard({
         setIsAutoPicking(false);
       })();
     }
-  }, [timeLeft, state.draft.status, state.draft.id, isAutoPicking, isPicking, pollState]);
+  }, [timeLeft, state.draft.status, state.draft.id, isAutoPicking, isPicking, isBotTurn, pollState]);
+
+  // Process bot picks automatically
+  useEffect(() => {
+    if (
+      state.draft.status === "in_progress" &&
+      isBotTurn &&
+      !botPickProcessingRef.current &&
+      !isBotPicking
+    ) {
+      botPickProcessingRef.current = true;
+      setIsBotPicking(true);
+
+      // Small delay so user can see it's the bot's turn
+      const timer = setTimeout(async () => {
+        const result = await processBotPicksAction(state.draft.id);
+        if (!result.error) {
+          await pollState();
+        }
+        setIsBotPicking(false);
+        botPickProcessingRef.current = false;
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [state.draft.status, state.draft.id, isBotTurn, isBotPicking, pollState]);
+
+  // Reset bot pick flag when pick changes
+  useEffect(() => {
+    if (currentPick !== lastPickRef.current) {
+      botPickProcessingRef.current = false;
+    }
+  }, [currentPick]);
 
   // Format time as MM:SS
   const timerMinutes = Math.floor(timeLeft / 60);
@@ -309,6 +348,16 @@ export function DraftBoard({
               AUTO-PICKING...
             </span>
           )}
+          {isBotPicking && (
+            <span className="text-xs font-semibold text-purple-400 animate-pulse">
+              BOT PICKING...
+            </span>
+          )}
+          {isBotTurn && !isBotPicking && (
+            <span className="text-xs font-semibold text-purple-400">
+              BOT TURN
+            </span>
+          )}
           {isMyTurn && !isPicking && !isAutoPicking && (
             <span className="text-xs font-semibold text-emerald-400 animate-pulse">
               YOUR PICK
@@ -337,6 +386,7 @@ export function DraftBoard({
                 {members.map((member) => {
                   const isUser = member.id === state.currentUserMemberId;
                   const isOTC = member.id === state.onTheClockMemberId;
+                  const isBot = member.isBot;
                   return (
                     <th
                       key={member.id}
@@ -345,6 +395,8 @@ export function DraftBoard({
                           ? "bg-indigo-900 text-indigo-300"
                           : isUser
                           ? "bg-gray-700 text-blue-300"
+                          : isBot
+                          ? "bg-gray-800 text-purple-400"
                           : "bg-gray-800 text-gray-400"
                       }`}
                     >
@@ -353,6 +405,9 @@ export function DraftBoard({
                       </div>
                       {isUser && (
                         <span className="text-[8px] text-blue-400">YOU</span>
+                      )}
+                      {isBot && (
+                        <span className="text-[8px] text-purple-400">BOT</span>
                       )}
                     </th>
                   );

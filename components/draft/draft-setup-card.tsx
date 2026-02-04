@@ -17,6 +17,7 @@ type DraftOrder = {
   userName: string | null;
   userEmail: string;
   teamName: string | null;
+  isBot?: boolean;
 };
 
 type Draft = {
@@ -175,8 +176,15 @@ export function DraftSetupCard({
                   {entry.position}.
                 </span>
                 <span className="text-sm">
-                  {entry.teamName || entry.userName || entry.userEmail}
+                  {entry.isBot
+                    ? entry.teamName || "Bot"
+                    : entry.teamName || entry.userName || entry.userEmail}
                 </span>
+                {entry.isBot && (
+                  <span className="text-[10px] bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded">
+                    Bot
+                  </span>
+                )}
               </div>
             ))}
           </div>

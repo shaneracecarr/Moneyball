@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Moneyball is a fantasy football league management application built with Next.js 14, NextAuth v5, SQLite (via Drizzle ORM), and Tailwind CSS. Users can create accounts, manage fantasy football leagues, draft players (snake draft format), manage team rosters, and pick up free agents.
+Moneyball is a fantasy football league management application built with Next.js 14, NextAuth v5, PostgreSQL (Supabase) with Drizzle ORM, and Tailwind CSS. Users can create accounts, manage fantasy football leagues, draft players (snake draft format), manage team rosters, trade players, and pick up free agents.
 
 ## Tech Stack
 
@@ -29,7 +29,7 @@ app/
   (dashboard)/
     layout.tsx                      # Dashboard layout wrapper
     dashboard/page.tsx              # Main dashboard
-    admin/page.tsx                  # Admin page
+    admin/page.tsx                  # Admin page (week controls)
     players/page.tsx                # Player browser with filters + "Add to Team"
     mock-draft/page.tsx             # Client-side mock draft against AI
     my-teams/page.tsx               # All user leagues with roster status
@@ -40,20 +40,31 @@ app/
       [id]/draft/page.tsx           # Live draft board
       [id]/team/page.tsx            # Team roster management (dynamic slots from settings)
       [id]/settings/page.tsx        # League settings (commissioner edit / member view)
+      [id]/matchup/page.tsx         # Current week matchup view
+      [id]/standings/page.tsx       # League standings
+      [id]/trades/page.tsx          # Trade proposals and history
+      [id]/inbox/page.tsx           # Trade notifications inbox
+      [id]/chat/page.tsx            # League chat
   api/
     auth/[...nextauth]/route.ts     # NextAuth API route
     players/sync/route.ts           # POST: sync players from Sleeper API
+    players/import-fantasy/route.ts # POST: import fantasy projections
+    players/import-stats/route.ts   # POST: import player stats
 
 components/
-  ui/         # button, input, card, label (shadcn-style)
-  auth/       # login-form, signup-form
-  dashboard/  # navbar
-  draft/      # draft-board, draft-setup-card, draft-complete-summary, player-list, team-roster
-  mock-draft/ # mock-draft-board (client-side draft vs AI), mock-draft-setup (setup form)
-  players/    # players-filters, players-table (with "Add to Team" actions)
-  roster/     # team-roster-page, roster-section, free-agent-search
-  leagues/    # copy-invite-code, set-active-league, league-settings-form, activity-feed
-  home/       # hero
+  ui/           # button, input, card, label (shadcn-style)
+  auth/         # login-form, signup-form
+  dashboard/    # navbar
+  draft/        # draft-board, draft-setup-card, draft-complete-summary, player-list, team-roster
+  mock-draft/   # mock-draft-board (client-side draft vs AI), mock-draft-setup (setup form)
+  players/      # players-filters, players-table (with "Add to Team" actions)
+  roster/       # team-roster-page, roster-section, free-agent-search
+  leagues/      # copy-invite-code, set-active-league, league-settings-form, activity-feed
+  matchup/      # matchup-view
+  trades/       # trade components
+  chat/         # chat components
+  player-card/  # player-name-link, player-card-dialog
+  home/         # hero
 
 lib/
   db/
@@ -63,10 +74,19 @@ lib/
   actions/
     auth.ts           # signUpAction, signInAction
     leagues.ts        # createLeagueAction, getUserLeaguesAction, getLeagueDetailsAction, joinLeagueByCodeAction
-    draft.ts          # setupDraftAction, startDraftAction, makePickAction, getDraftStateAction, searchAvailablePlayersAction, randomizeDraftOrderAction
+    draft.ts          # setupDraftAction, startDraftAction, makePickAction, getDraftStateAction, searchAvailablePlayersAction, randomizeDraftOrderAction, processBotPicksAction, isCurrentPickBotAction
+    bot.ts            # setBotLineupAction, setAllBotLineupsAction, botFillRosterAction, fillAllBotRostersAction, botRespondToTradeAction, processBotTradeResponsesAction
     roster.ts         # getUserRosterAction, movePlayerAction, pickupPlayerAction, dropAndAddAction, dropPlayerAction, searchFreeAgentsAction, setActiveLeagueAction
     settings.ts       # getLeagueSettingsAction, updateLeagueSettingsAction
+    league-settings.ts # Additional league settings actions
     mock-draft.ts     # getAllPlayersAction
+    matchups.ts       # Matchup-related actions
+    standings.ts      # Standings-related actions
+    trades.ts         # Trade proposal and response actions
+    chat.ts           # Chat message actions
+    player-card.ts    # Player card data actions
+    admin-week.ts     # Admin week controls (start week, advance week for all leagues)
+    league-phase.ts   # Commissioner week controls (start week, advance week per league)
   validations/
     auth.ts           # signUpSchema, signInSchema, createLeagueSchema
     draft.ts          # setupDraftSchema, makePickSchema
@@ -82,7 +102,7 @@ types/
   next-auth.d.ts      # Session/JWT type extensions (adds user.id)
 
 auth.ts               # NextAuth configuration
-middleware.ts          # Route protection
+middleware.ts         # Route protection
 drizzle.config.ts     # Drizzle ORM config
 ```
 
@@ -102,10 +122,10 @@ Tables defined in `lib/db/schema.ts`:
 
 | Table | Purpose |
 |-------|---------|
-| `users` | User accounts (email, hashed password, name) |
+| `users` | User accounts (email, hashed password, name, isAdmin flag) |
 | `leagues` | Fantasy leagues (name, team count, invite code, currentWeek, phase) |
 | `league_settings` | Per-league configuration (roster slot counts, scoring format, trade rules) |
-| `league_members` | League membership with commissioner flag and team name |
+| `league_members` | League membership with commissioner flag, team name, and isBot flag |
 | `drafts` | Draft instances (status: scheduled/in_progress/completed, round count, current pick) |
 | `draft_order` | Randomized pick order per draft |
 | `draft_picks` | Individual picks made during a draft |
@@ -147,6 +167,13 @@ All tables use UUID primary keys and timestamp tracking.
 - On draft completion, `populateRosterFromDraft()` auto-assigns picks to roster slots using the league's dynamic slot config (starters first, then bench)
 - `draft.ts` actions use an internal `getDraftByLeagueId_internal()` helper to look up drafts by their own ID (not league ID)
 
+### League Phase System
+- Leagues have a `phase` field: `setup` → `drafting` → `pre_week` → `week_active` → `complete`
+- `currentWeek` tracks the current week (1-17 for regular season)
+- **Admin controls** (`/admin`): Site-wide week management for all leagues
+- **Commissioner controls**: Per-league week management via `league-phase.ts` actions
+- Week scoring uses `lib/scoring-utils.ts` to calculate fantasy points based on player ADP
+
 ### League Settings System
 - **Per-league configuration** stored in `league_settings` table (one-to-one with `leagues`)
 - **Configurable roster positions**: QB (1-3), RB (1-4), WR (1-4), TE (1-3), FLEX (0-3), K (0-2), DEF (0-2), Bench (4-10), IR (0-4)
@@ -178,12 +205,19 @@ All tables use UUID primary keys and timestamp tracking.
 - Players synced via POST to `/api/players/sync` (requires auth)
 - Fetches from Sleeper API, filters to positions: QB, RB, WR, TE, K, DEF
 - Upserts by `sleeperId` to avoid duplicates
-- Player records include: name, team, position, status, injuryStatus, age, experience, number
+- Player records include: name, team, position, status, injuryStatus, age, experience, number, ADP, seasonPoints
 
 ### League System
 - Invite codes use ABC-1234 format with uniqueness checking
 - Creator is automatically added as commissioner
 - League must reach capacity (`numberOfTeams`) before draft can begin
+
+### Trade System
+- League members can propose trades to other members
+- Trades include players from both sides
+- Recipients can accept or decline
+- Trade deadline can be configured in league settings
+- Activity feed tracks completed trades
 
 ### Mock Draft (Standalone)
 - `/mock-draft` provides a client-side-only mock draft experience against AI opponents
@@ -192,8 +226,72 @@ All tables use UUID primary keys and timestamp tracking.
 - AI uses position-priority strategy by round (early rounds: RB/WR, mid rounds: add QB/TE, late rounds: K/DEF)
 - After draft completion, shows summary with all picks; user can start a new mock draft
 
+### Bot Teams System
+- **Bot teams** are AI-controlled league members that act autonomously
+- **Identification**: Bot teams have `isBot: true` in `league_members` table, with `userId: null`
+- **Creation**: During league creation, users can add bot teams via "Add Bot" button
+  - Each bot can be renamed (default: "Bot 1", "Bot 2", etc.)
+  - Maximum bots = `numberOfTeams - 1` (at least 1 human required)
+  - Bot teams are created with `createLeagueMember(leagueId, null, teamName, false, true)`
+
+#### Bot Drafting Behavior
+- **Trigger**: When it's a bot's turn during a live draft, the draft board auto-triggers bot picks
+- **Strategy**: Bots pick the best available player by ADP (lowest ADP = best)
+- **Implementation**: `processBotPicksAction(draftId)` processes all consecutive bot picks in a loop
+- **Delay**: 1 second delay before each bot pick for visual feedback
+- **UI**: Draft board shows "BOT TURN" and "BOT PICKING..." status indicators
+- **Column headers**: Bot teams display purple "BOT" badge
+
+#### Bot-Related Functions (`lib/actions/bot.ts` and `lib/actions/draft.ts`)
+- `getBestAvailablePlayerByAdp(draftId)` — Returns the highest-ranked available player
+- `processBotPicksAction(draftId)` — Processes all consecutive bot picks during draft
+- `isCurrentPickBotAction(draftId)` — Checks if current pick is a bot's turn
+- `getMemberById(memberId)` — Gets member info including `isBot` flag
+- `getLeagueBotMembers(leagueId)` — Gets all bot members in a league
+- `setBotLineupAction(memberId, leagueId)` — Sets optimal lineup for one bot
+- `setAllBotLineupsAction(leagueId)` — Sets lineups for all bots in a league
+- `botFillRosterAction(memberId, leagueId)` — Fills empty roster slots for one bot
+- `fillAllBotRostersAction(leagueId)` — Fills rosters for all bots in a league
+- `botRespondToTradeAction(tradeId, botMemberId)` — Bot responds to a trade proposal
+- `processBotTradeResponsesAction(tradeId)` — Processes all bot recipients in a trade
+
+#### Bot Weekly Lineup Setting
+- **Trigger**: Called automatically when `startWeekAction` is executed (week locks)
+- **Strategy**: Sort roster by ADP (lowest = best), fill starter slots with best eligible players
+- **Process**:
+  1. Get all roster players with ADP
+  2. For each starter slot, find best unassigned player matching position requirements
+  3. Remaining players go to bench
+- **Integration**: `league-phase.ts` calls `setAllBotLineupsAction()` before transitioning to `week_active`
+
+#### Bot Free Agent Pickups
+- **Trigger**: Called automatically when `advanceWeekAction` is executed (entering `pre_week` phase)
+- **Strategy**: Find empty bench slots, pick up best available free agents by ADP
+- **Process**:
+  1. Identify empty bench slots
+  2. Search free agents sorted by ADP
+  3. Add best available to each empty slot
+  4. Create activity feed events and chat messages
+- **Integration**: `league-phase.ts` calls `fillAllBotRostersAction()` after advancing to next week
+
+#### Bot Trade Responses
+- **Trigger**: Called immediately when `createTradeAction` completes
+- **Strategy**: Compare average ADP of players receiving vs giving away
+- **Decision Logic**:
+  - Calculate average ADP of players bot would receive
+  - Calculate average ADP of players bot would give away
+  - Accept if receiving average ADP ≤ giving average ADP × 1.1 (10% tolerance)
+  - Decline otherwise
+- **Process**:
+  1. Check if any trade recipients are bots
+  2. For each bot recipient, evaluate trade value using ADP
+  3. Accept or decline immediately
+  4. If accepted by all, execute trade automatically
+- **Integration**: `trades.ts` calls `processBotTradeResponsesAction()` after creating trade
+
 ### Navigation
-- Navbar links: Dashboard, Players, Mock Draft, Admin (when active league selected: League, Team, Matchup, Standings, Trades, Inbox, Chat)
+- Navbar links: Dashboard, Players, Mock Draft, Admin
+- When active league selected, shows: League, Team, Matchup, Standings, Trades, Inbox, Chat
 - "My Teams" page (`/my-teams`) lists all user's leagues with roster fill counts and links to manage each team
 - League detail page has "My Team" button linking to `/leagues/[id]/team` and "Settings" button linking to `/leagues/[id]/settings`
 
