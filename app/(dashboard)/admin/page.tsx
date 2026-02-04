@@ -342,13 +342,6 @@ export default function AdminPage() {
           description="Pull ALL players with full season stats from every NFL team roster. Stores passing, rushing, receiving, and defensive stats plus metadata. Fetches all 32 teams sequentially."
         />
 
-        <ImportButton
-          label="Sync Players from Sleeper"
-          loadingLabel="Syncing Players..."
-          endpoint="/api/players/sync"
-          description="Fetch player data from Sleeper API and update the database. This will replace all existing players with fresh Sleeper data."
-        />
-
         <Card>
           <CardHeader>
             <CardTitle>Quick Links</CardTitle>

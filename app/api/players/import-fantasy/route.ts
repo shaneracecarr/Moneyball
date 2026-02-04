@@ -8,7 +8,6 @@ export const dynamic = "force-dynamic";
 
 const RAPIDAPI_HOST =
   "tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com";
-const RAPIDAPI_KEY = "760540a073msh39d8377336215fbp1f2ad5jsndc6dd586ff8f";
 const FANTASY_POSITIONS = ["QB", "RB", "WR", "TE", "K"];
 
 export async function POST(request: NextRequest) {
@@ -16,6 +15,11 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const apiKey = process.env.RAPIDAPI_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: "RapidAPI key not configured" }, { status: 500 });
     }
 
     console.log("Starting fantasy player import from RapidAPI...");
@@ -26,7 +30,7 @@ export async function POST(request: NextRequest) {
       {
         headers: {
           "x-rapidapi-host": RAPIDAPI_HOST,
-          "x-rapidapi-key": RAPIDAPI_KEY,
+          "x-rapidapi-key": apiKey,
         },
       }
     );
@@ -52,14 +56,15 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const sleeperId = p.sleeperBotID;
-      if (!sleeperId) {
+      const fullName = p.longName;
+      if (!fullName) {
         skipped++;
         continue;
       }
 
-      const fullName = p.longName;
-      if (!fullName) {
+      // Use sleeperBotID if available, otherwise use rapidapi playerID
+      const sleeperId = p.sleeperBotID || `rapidapi_${p.playerID}`;
+      if (!sleeperId || sleeperId === "rapidapi_undefined") {
         skipped++;
         continue;
       }
@@ -117,7 +122,7 @@ export async function POST(request: NextRequest) {
       {
         headers: {
           "x-rapidapi-host": RAPIDAPI_HOST,
-          "x-rapidapi-key": RAPIDAPI_KEY,
+          "x-rapidapi-key": apiKey,
         },
       }
     );
