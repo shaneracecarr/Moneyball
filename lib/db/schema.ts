@@ -31,6 +31,9 @@ export const leagues = pgTable("leagues", {
   })
     .notNull()
     .default("setup"),
+  isMock: boolean("is_mock")
+    .notNull()
+    .default(false),
   createdAt: timestamp("created_at")
     .notNull()
     .defaultNow(),
@@ -292,6 +295,28 @@ export const chatMessages = pgTable("chat_messages", {
   memberId: text("member_id").references(() => leagueMembers.id),
   text: text("text").notNull(),
   metadata: text("metadata"),
+  createdAt: timestamp("created_at")
+    .notNull()
+    .defaultNow(),
+});
+
+// Mock league weekly player stats (generated randomly for mock leagues)
+export const mockPlayerStats = pgTable("mock_player_stats", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  leagueId: text("league_id")
+    .notNull()
+    .references(() => leagues.id),
+  playerId: text("player_id")
+    .notNull()
+    .references(() => players.id),
+  week: integer("week").notNull(),
+  points: doublePrecision("points").notNull(),
+  isOnBye: boolean("is_on_bye")
+    .notNull()
+    .default(false),
+  isInjured: boolean("is_injured")
+    .notNull()
+    .default(false),
   createdAt: timestamp("created_at")
     .notNull()
     .defaultNow(),

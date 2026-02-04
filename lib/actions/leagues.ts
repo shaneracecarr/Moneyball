@@ -54,6 +54,9 @@ export async function createLeagueAction(formData: FormData) {
       return { error: `Cannot have ${botTeams.length} bots with only ${validatedData.numberOfTeams} teams (need at least 1 human)` };
     }
 
+    // Check if this is a mock league
+    const isMock = formData.get("isMock") === "true";
+
     // Generate unique invite code
     let inviteCode = generateInviteCode();
     let attempts = 0;
@@ -70,7 +73,8 @@ export async function createLeagueAction(formData: FormData) {
       validatedData.name,
       validatedData.numberOfTeams,
       inviteCode,
-      session.user.id
+      session.user.id,
+      isMock
     );
 
     // Add creator as commissioner

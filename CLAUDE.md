@@ -87,6 +87,7 @@ lib/
     player-card.ts    # Player card data actions
     admin-week.ts     # Admin week controls (start week, advance week for all leagues)
     league-phase.ts   # Commissioner week controls (start week, advance week per league)
+    mock-league.ts    # Mock league stats generation and retrieval
   validations/
     auth.ts           # signUpSchema, signInSchema, createLeagueSchema
     draft.ts          # setupDraftSchema, makePickSchema
@@ -123,7 +124,7 @@ Tables defined in `lib/db/schema.ts`:
 | Table | Purpose |
 |-------|---------|
 | `users` | User accounts (email, hashed password, name, isAdmin flag) |
-| `leagues` | Fantasy leagues (name, team count, invite code, currentWeek, phase) |
+| `leagues` | Fantasy leagues (name, team count, invite code, currentWeek, phase, isMock) |
 | `league_settings` | Per-league configuration (roster slot counts, scoring format, trade rules) |
 | `league_members` | League membership (leagueId, userId, teamName, isCommissioner, isBot) |
 | `drafts` | Draft instances (status: scheduled/in_progress/completed, round count, current pick) |
@@ -138,6 +139,7 @@ Tables defined in `lib/db/schema.ts`:
 | `notifications` | User notifications for trades |
 | `league_activity` | League activity feed events |
 | `chat_messages` | League chat/messaging |
+| `mock_player_stats` | Weekly randomly-generated player stats for mock leagues |
 
 All tables use UUID primary keys and timestamp tracking.
 
@@ -321,6 +323,50 @@ leagueMembers = pgTable("league_members", {
   3. Accept or decline immediately
   4. If accepted by all, execute trade automatically
 - **Integration**: `trades.ts` calls `processBotTradeResponsesAction()` after creating trade
+
+### Mock League System
+- **Mock leagues** are testing/practice leagues with randomly generated player stats instead of real NFL data
+- **Identification**: Mock leagues have `isMock: true` in the `leagues` table
+- **Creation**: During league creation, users can check "Mock League (for testing)" checkbox
+- **Purpose**: Perfect for testing strategies, playing during off-season, or learning the app
+
+#### Mock Stats Generation
+- **Storage**: `mock_player_stats` table stores generated stats per player, per week, per league
+- **Trigger**: Stats are generated automatically when `advanceWeekAction` is called for a mock league
+- **Position-based score ranges**:
+  - QB: 10-30 points
+  - RB: 5-25 points
+  - WR: 5-25 points
+  - TE: 3-15 points
+  - K: 5-15 points
+  - DEF: 0-20 points
+- **Bye weeks**: 2-3 random teams are on bye each week (players get 0 points)
+- **Injuries**: ~5% chance per player per week (injured players get 0 points)
+
+#### Mock League Commissioner Controls
+- **Component**: `LeaguePhaseControls` component displays commissioner controls when:
+  - User is the commissioner
+  - League is in `pre_week` or `week_active` phase
+- **Start Week** button: Locks lineups and transitions to `week_active`
+- **Advance Week** button: Generates mock stats (if needed), scores matchups, advances to next week
+- **UI Indicators**: Purple "Mock League" badge displayed throughout the app
+
+#### Mock League Server Actions (`lib/actions/mock-league.ts`)
+- `generateMockStatsForWeekAction(leagueId, week)` — Manually generates mock stats (commissioner only)
+- `getMockStatsForWeekAction(leagueId, week)` — Retrieves mock stats for display
+
+#### Mock League Scoring
+- **Regular leagues**: Use ADP-based scoring via `calculateTeamScore()` in `lib/scoring-utils.ts`
+- **Mock leagues**: Use pre-generated mock stats via `calculateMockTeamScore()` in `lib/actions/league-phase.ts`
+- The `advanceWeekAction` checks `league.isMock` and uses appropriate scoring method
+
+#### Mock League Database Queries (`lib/db/queries.ts`)
+- `getMockPlayerStats(leagueId, week)` — Gets all mock stats for a week
+- `getMockPlayerStatsForPlayer(leagueId, playerId, week)` — Gets stats for one player
+- `createMockPlayerStats(data)` — Creates a single mock stat entry
+- `createMockPlayerStatsBatch(stats[])` — Batch creates mock stats for efficiency
+- `mockStatsExistForWeek(leagueId, week)` — Checks if stats already generated
+- `getAllRosteredPlayerIds(leagueId)` — Gets all rostered player IDs in a league
 
 ### Navigation
 - Navbar links: Dashboard, Players, Mock Draft, Admin

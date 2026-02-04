@@ -21,6 +21,7 @@ export default function CreateLeaguePage() {
   const [settings, setSettings] = useState(DEFAULT_LEAGUE_SETTINGS);
   const [numberOfTeams, setNumberOfTeams] = useState(12);
   const [botTeams, setBotTeams] = useState<BotTeam[]>([]);
+  const [isMock, setIsMock] = useState(false);
 
   const totalStarters = settings.qbCount + settings.rbCount + settings.wrCount +
     settings.teCount + settings.flexCount + settings.kCount + settings.defCount;
@@ -36,6 +37,8 @@ export default function CreateLeaguePage() {
 
     // Add bot teams to form data
     formData.set("botTeams", JSON.stringify(botTeams.map(b => ({ name: b.name }))));
+    // Add mock league flag
+    formData.set("isMock", isMock ? "true" : "false");
 
     const result = await createLeagueAction(formData);
 
@@ -114,6 +117,28 @@ export default function CreateLeaguePage() {
                 <option value="14">14 Teams</option>
                 <option value="16">16 Teams</option>
               </select>
+            </div>
+
+            {/* Mock League Option */}
+            <div className="space-y-2 rounded-lg border border-purple-200 bg-purple-50 p-4">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isMock"
+                  checked={isMock}
+                  onChange={(e) => setIsMock(e.target.checked)}
+                  disabled={isLoading}
+                  className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-600"
+                />
+                <Label htmlFor="isMock" className="text-sm font-medium text-purple-900">
+                  Mock League (for testing)
+                </Label>
+              </div>
+              <p className="text-xs text-purple-700 ml-7">
+                Mock leagues use randomly generated stats instead of real NFL data.
+                Perfect for testing strategies or playing during the off-season.
+                The commissioner can advance weeks manually.
+              </p>
             </div>
 
             {/* Bot Teams Section */}

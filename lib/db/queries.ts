@@ -1,6 +1,6 @@
 import { eq, and, or, like, desc, asc, notInArray, inArray, sql, isNotNull, ne } from "drizzle-orm";
 import { db } from "./index";
-import { users, leagues, leagueMembers, players, drafts, draftOrder, draftPicks, rosterPlayers, matchups, trades, tradeParticipants, tradeItems, notifications, leagueActivity, chatMessages, leagueSettings } from "./schema";
+import { users, leagues, leagueMembers, players, drafts, draftOrder, draftPicks, rosterPlayers, matchups, trades, tradeParticipants, tradeItems, notifications, leagueActivity, chatMessages, leagueSettings, mockPlayerStats } from "./schema";
 import { DEFAULT_LEAGUE_SETTINGS, type LeagueSettings } from "../league-settings";
 import { generateSlotConfig } from "../roster-config";
 
@@ -23,11 +23,12 @@ export async function createLeague(
   name: string,
   numberOfTeams: number,
   inviteCode: string,
-  createdBy: string
+  createdBy: string,
+  isMock: boolean = false
 ) {
   const result = await db
     .insert(leagues)
-    .values({ name, numberOfTeams, inviteCode, createdBy })
+    .values({ name, numberOfTeams, inviteCode, createdBy, isMock })
     .returning();
   return result[0];
 }
@@ -56,6 +57,7 @@ export async function getUserLeagues(userId: string) {
       isCommissioner: leagueMembers.isCommissioner,
       currentWeek: leagues.currentWeek,
       phase: leagues.phase,
+      isMock: leagues.isMock,
       createdAt: leagues.createdAt,
     })
     .from(leagueMembers)
@@ -1164,5 +1166,122 @@ export async function getBestAvailablePlayerByAdp(
     .limit(1);
 
   return result[0] || null;
+}
+
+// Mock Player Stats queries
+
+export async function getMockPlayerStats(leagueId: string, week: number) {
+  const result = await db
+    .select({
+      id: mockPlayerStats.id,
+      leagueId: mockPlayerStats.leagueId,
+      playerId: mockPlayerStats.playerId,
+      week: mockPlayerStats.week,
+      points: mockPlayerStats.points,
+      isOnBye: mockPlayerStats.isOnBye,
+      isInjured: mockPlayerStats.isInjured,
+      playerName: players.fullName,
+      playerPosition: players.position,
+      playerTeam: players.team,
+    })
+    .from(mockPlayerStats)
+    .innerJoin(players, eq(mockPlayerStats.playerId, players.id))
+    .where(
+      and(
+        eq(mockPlayerStats.leagueId, leagueId),
+        eq(mockPlayerStats.week, week)
+      )
+    );
+  return result;
+}
+
+export async function getMockPlayerStatsForPlayer(
+  leagueId: string,
+  playerId: string,
+  week: number
+) {
+  const result = await db
+    .select()
+    .from(mockPlayerStats)
+    .where(
+      and(
+        eq(mockPlayerStats.leagueId, leagueId),
+        eq(mockPlayerStats.playerId, playerId),
+        eq(mockPlayerStats.week, week)
+      )
+    )
+    .limit(1);
+  return result[0] || null;
+}
+
+export async function createMockPlayerStats(data: {
+  leagueId: string;
+  playerId: string;
+  week: number;
+  points: number;
+  isOnBye?: boolean;
+  isInjured?: boolean;
+}) {
+  const result = await db
+    .insert(mockPlayerStats)
+    .values({
+      leagueId: data.leagueId,
+      playerId: data.playerId,
+      week: data.week,
+      points: data.points,
+      isOnBye: data.isOnBye ?? false,
+      isInjured: data.isInjured ?? false,
+    })
+    .returning();
+  return result[0];
+}
+
+export async function createMockPlayerStatsBatch(
+  stats: {
+    leagueId: string;
+    playerId: string;
+    week: number;
+    points: number;
+    isOnBye?: boolean;
+    isInjured?: boolean;
+  }[]
+) {
+  if (stats.length === 0) return [];
+  const result = await db
+    .insert(mockPlayerStats)
+    .values(
+      stats.map((s) => ({
+        leagueId: s.leagueId,
+        playerId: s.playerId,
+        week: s.week,
+        points: s.points,
+        isOnBye: s.isOnBye ?? false,
+        isInjured: s.isInjured ?? false,
+      }))
+    )
+    .returning();
+  return result;
+}
+
+export async function mockStatsExistForWeek(leagueId: string, week: number) {
+  const result = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(mockPlayerStats)
+    .where(
+      and(
+        eq(mockPlayerStats.leagueId, leagueId),
+        eq(mockPlayerStats.week, week)
+      )
+    );
+  return (result[0]?.count ?? 0) > 0;
+}
+
+export async function getAllRosteredPlayerIds(leagueId: string) {
+  const result = await db
+    .select({ playerId: rosterPlayers.playerId })
+    .from(rosterPlayers)
+    .innerJoin(leagueMembers, eq(rosterPlayers.memberId, leagueMembers.id))
+    .where(eq(leagueMembers.leagueId, leagueId));
+  return result.map((r) => r.playerId);
 }
 

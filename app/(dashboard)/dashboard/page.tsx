@@ -89,6 +89,11 @@ export default async function DashboardPage() {
                     <div className="flex items-center justify-between gap-2">
                       <CardTitle className="truncate">{league.name}</CardTitle>
                       <div className="flex items-center gap-1.5 shrink-0">
+                        {league.isMock && (
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                            Mock
+                          </span>
+                        )}
                         {isActive && (
                           <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
                             Active

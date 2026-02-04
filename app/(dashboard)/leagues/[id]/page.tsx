@@ -92,7 +92,14 @@ export default async function LeagueDetailPage({ params }: { params: { id: strin
         {/* League Info */}
         <Card>
           <CardHeader>
-            <CardTitle>{league.name}</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle>{league.name}</CardTitle>
+              {league.isMock && (
+                <span className="inline-flex items-center rounded-md bg-purple-100 px-2 py-1 text-xs font-medium text-purple-800 ring-1 ring-inset ring-purple-700/10">
+                  Mock
+                </span>
+              )}
+            </div>
             <CardDescription>League Details</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -266,6 +273,9 @@ export default async function LeagueDetailPage({ params }: { params: { id: strin
               <LeaguePhaseControls
                 phase={league.phase}
                 currentWeek={league.currentWeek}
+                leagueId={league.id}
+                isCommissioner={currentUserMember?.isCommissioner ?? false}
+                isMock={league.isMock ?? false}
               />
             </CardContent>
           </Card>
