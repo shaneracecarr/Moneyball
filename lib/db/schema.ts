@@ -1,4 +1,4 @@
-import { pgTable, text, integer, doublePrecision, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, doublePrecision, boolean, timestamp, date, decimal, unique } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -321,3 +321,86 @@ export const mockPlayerStats = pgTable("mock_player_stats", {
     .notNull()
     .defaultNow(),
 });
+
+// Historical game-by-game stats for players (past 3 seasons)
+export const playerGameStats = pgTable("player_game_stats", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  playerId: text("player_id")
+    .notNull()
+    .references(() => players.id, { onDelete: "cascade" }),
+
+  // Game identification
+  gameId: text("game_id").notNull(),  // e.g., "20240211_SF@KC"
+  season: integer("season").notNull(),  // e.g., 2024
+  week: integer("week").notNull(),  // 1-18 regular, 19+ playoffs
+  opponent: text("opponent"),  // team abbreviation
+  isHome: boolean("is_home").default(false),
+  gameDate: date("game_date"),
+
+  // Passing stats
+  passAttempts: integer("pass_attempts").default(0),
+  passCompletions: integer("pass_completions").default(0),
+  passYards: integer("pass_yards").default(0),
+  passTds: integer("pass_tds").default(0),
+  passInts: integer("pass_ints").default(0),
+  passRating: doublePrecision("pass_rating"),
+  qbr: doublePrecision("qbr"),
+  timesSacked: integer("times_sacked").default(0),
+  sackYardsLost: integer("sack_yards_lost").default(0),
+
+  // Rushing stats
+  rushAttempts: integer("rush_attempts").default(0),
+  rushYards: integer("rush_yards").default(0),
+  rushTds: integer("rush_tds").default(0),
+  rushLong: integer("rush_long").default(0),
+
+  // Receiving stats
+  targets: integer("targets").default(0),
+  receptions: integer("receptions").default(0),
+  recYards: integer("rec_yards").default(0),
+  recTds: integer("rec_tds").default(0),
+  recLong: integer("rec_long").default(0),
+
+  // Kicking stats
+  fgMade: integer("fg_made").default(0),
+  fgAttempted: integer("fg_attempted").default(0),
+  fgLong: integer("fg_long").default(0),
+  xpMade: integer("xp_made").default(0),
+  xpAttempted: integer("xp_attempted").default(0),
+
+  // Defense stats
+  defTackles: integer("def_tackles").default(0),
+  defSacks: doublePrecision("def_sacks").default(0),
+  defInts: integer("def_ints").default(0),
+  defFumblesForced: integer("def_fumbles_forced").default(0),
+  defFumblesRecovered: integer("def_fumbles_recovered").default(0),
+  defTds: integer("def_tds").default(0),
+  defPointsAllowed: integer("def_points_allowed"),
+
+  // Fumbles
+  fumbles: integer("fumbles").default(0),
+  fumblesLost: integer("fumbles_lost").default(0),
+
+  // Snap counts
+  offSnaps: integer("off_snaps").default(0),
+  offSnapPct: doublePrecision("off_snap_pct").default(0),
+  defSnaps: integer("def_snaps").default(0),
+  defSnapPct: doublePrecision("def_snap_pct").default(0),
+
+  // Fantasy points (pre-calculated)
+  fantasyPointsStandard: doublePrecision("fantasy_points_standard"),
+  fantasyPointsPpr: doublePrecision("fantasy_points_ppr"),
+  fantasyPointsHalfPpr: doublePrecision("fantasy_points_half_ppr"),
+
+  // Metadata
+  createdAt: timestamp("created_at")
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+}, (table) => ({
+  // Unique constraint to prevent duplicates
+  playerGameUnique: unique().on(table.playerId, table.gameId),
+}));

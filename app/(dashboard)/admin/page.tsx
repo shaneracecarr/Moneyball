@@ -26,6 +26,19 @@ type ImportResult = {
   details?: string;
 };
 
+type HistoryImportResult = {
+  success?: boolean;
+  processed?: number;
+  gamesImported?: number;
+  offset?: number;
+  nextOffset?: number;
+  complete?: boolean;
+  message?: string;
+  error?: string;
+  details?: string;
+  errors?: string[];
+};
+
 function ImportButton({
   label,
   loadingLabel,
@@ -121,6 +134,115 @@ function ImportButton({
                 </div>
               </div>
             )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function HistoryImportButton() {
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<{
+    totalProcessed: number;
+    totalGames: number;
+    currentOffset: number;
+    complete: boolean;
+  }>({ totalProcessed: 0, totalGames: 0, currentOffset: 0, complete: false });
+  const [error, setError] = useState<string | null>(null);
+
+  async function runBatch(offset: number): Promise<HistoryImportResult> {
+    const response = await fetch(`/api/players/import-history?offset=${offset}&batchSize=25`, {
+      method: "POST",
+    });
+    return response.json();
+  }
+
+  async function handleClick() {
+    setLoading(true);
+    setError(null);
+    setProgress({ totalProcessed: 0, totalGames: 0, currentOffset: 0, complete: false });
+
+    let offset = 0;
+    let totalProcessed = 0;
+    let totalGames = 0;
+
+    try {
+      while (true) {
+        const result = await runBatch(offset);
+
+        if (result.error) {
+          setError(result.error + (result.details ? `: ${result.details}` : ""));
+          break;
+        }
+
+        totalProcessed += result.processed || 0;
+        totalGames += result.gamesImported || 0;
+        offset = result.nextOffset || offset;
+
+        setProgress({
+          totalProcessed,
+          totalGames,
+          currentOffset: offset,
+          complete: result.complete || false,
+        });
+
+        if (result.complete) {
+          break;
+        }
+
+        // Small delay between batches
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error occurred");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card className="border-2 border-blue-200">
+      <CardHeader>
+        <CardTitle>Import Historical Stats (3 Years)</CardTitle>
+        <CardDescription>
+          Pull game-by-game stats for all active fantasy players (QB, RB, WR, TE, K) for the past 3 seasons (2022-2024).
+          This runs in batches and may take several minutes.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Button onClick={handleClick} disabled={loading} className="bg-blue-600 hover:bg-blue-700">
+          {loading ? "Importing..." : "Import Historical Stats"}
+        </Button>
+
+        {loading && (
+          <div className="bg-blue-50 rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full" />
+              <span className="text-blue-800 font-medium">Import in progress...</span>
+            </div>
+            <div className="text-sm text-blue-700 space-y-1">
+              <p>Players processed: {progress.totalProcessed}</p>
+              <p>Games imported: {progress.totalGames}</p>
+              <p>Current offset: {progress.currentOffset}</p>
+            </div>
+            <p className="text-xs text-blue-600">Do not close this page. Running in batches to avoid timeouts.</p>
+          </div>
+        )}
+
+        {!loading && progress.complete && (
+          <div className="bg-green-50 rounded-lg p-4 text-green-800">
+            <p className="font-semibold">Import Complete!</p>
+            <p className="text-sm">
+              Processed {progress.totalProcessed} players, imported {progress.totalGames} game records.
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-red-50 rounded-lg p-4 text-red-800">
+            <p className="font-semibold">Error</p>
+            <p className="text-sm">{error}</p>
           </div>
         )}
       </CardContent>
@@ -341,6 +463,8 @@ export default function AdminPage() {
           endpoint="/api/players/import-stats"
           description="Pull ALL players with full season stats from every NFL team roster. Stores passing, rushing, receiving, and defensive stats plus metadata. Fetches all 32 teams sequentially."
         />
+
+        <HistoryImportButton />
 
         <Card>
           <CardHeader>
