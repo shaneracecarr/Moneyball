@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 const RAPIDAPI_HOST =
   "tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com";
-const FANTASY_POSITIONS = ["QB", "RB", "WR", "TE", "K"];
+// API uses "PK" for kickers, we store as "K"
+const FANTASY_POSITIONS = ["QB", "RB", "WR", "TE", "K", "PK"];
 
 export async function POST(request: NextRequest) {
   try {
@@ -79,6 +80,9 @@ export async function POST(request: NextRequest) {
         .where(eq(players.sleeperId, sleeperId))
         .limit(1);
 
+      // Map "PK" to "K" for kickers
+      const position = p.pos === "PK" ? "K" : p.pos;
+
       const playerData = {
         sleeperId,
         rapidApiId: p.playerID || null,
@@ -86,7 +90,7 @@ export async function POST(request: NextRequest) {
         firstName,
         lastName,
         team: p.team || null,
-        position: p.pos,
+        position,
         status: p.isFreeAgent === "True" ? "Free Agent" : "Active",
         injuryStatus: p.injury?.designation || null,
         age: p.age ? parseInt(p.age) : null,
