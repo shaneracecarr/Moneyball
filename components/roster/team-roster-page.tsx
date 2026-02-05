@@ -35,6 +35,14 @@ interface TeamRosterPageProps {
   teamName: string | null;
   slotConfig?: SlotConfig;
   currentWeek: number;
+  teamRecord?: { wins: number; losses: number; ties: number } | null;
+}
+
+function formatRecord(record: { wins: number; losses: number; ties: number } | null | undefined): string {
+  if (!record) return "";
+  const { wins, losses, ties } = record;
+  if (ties > 0) return `(${wins}-${losses}-${ties})`;
+  return `(${wins}-${losses})`;
 }
 
 export function TeamRosterPage({
@@ -45,6 +53,7 @@ export function TeamRosterPage({
   teamName,
   slotConfig,
   currentWeek,
+  teamRecord,
 }: TeamRosterPageProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -156,7 +165,12 @@ export function TeamRosterPage({
       {/* Team Name and Week Selector */}
       <div className="flex items-center justify-between">
         {teamName && (
-          <h2 className="text-xl font-bold text-white">{teamName}</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold text-white">{teamName}</h2>
+            {teamRecord && (
+              <span className="text-lg text-gray-400">{formatRecord(teamRecord)}</span>
+            )}
+          </div>
         )}
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-400">Viewing:</span>

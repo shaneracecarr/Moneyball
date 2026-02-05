@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getUserRosterAction } from "@/lib/actions/roster";
 import { getLeagueDetailsAction } from "@/lib/actions/leagues";
 import { getLeagueSettingsAction } from "@/lib/actions/settings";
+import { getStandingsAction } from "@/lib/actions/standings";
 import { generateSlotConfig } from "@/lib/roster-config";
 import { TeamRosterPage } from "@/components/roster/team-roster-page";
 import Link from "next/link";
@@ -56,12 +57,30 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
     );
   }
 
-  const settingsResult = await getLeagueSettingsAction(params.id);
+  const [settingsResult, standingsResult] = await Promise.all([
+    getLeagueSettingsAction(params.id),
+    getStandingsAction(params.id),
+  ]);
+
   const slotConfig = settingsResult.settings
     ? generateSlotConfig(settingsResult.settings)
     : undefined;
 
   const currentWeek = leagueResult.league.currentWeek || 1;
+
+  // Find user's member ID to get their record
+  const userMemberId = rosterResult.memberId;
+  let teamRecord: { wins: number; losses: number; ties: number } | null = null;
+  if (standingsResult && 'standings' in standingsResult && standingsResult.standings && userMemberId) {
+    const standing = standingsResult.standings.find((s) => s.memberId === userMemberId);
+    if (standing) {
+      teamRecord = {
+        wins: standing.wins,
+        losses: standing.losses,
+        ties: standing.ties,
+      };
+    }
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -79,6 +98,7 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
         teamName={rosterResult.teamName || null}
         slotConfig={slotConfig}
         currentWeek={currentWeek}
+        teamRecord={teamRecord}
       />
     </div>
   );

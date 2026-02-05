@@ -138,6 +138,81 @@ export async function getMatchupAction(leagueId: string, week: number) {
   }
 }
 
+export async function getSpecificMatchupAction(leagueId: string, week: number, matchupId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { error: "You must be logged in" };
+
+    const members = await getLeagueMembers(leagueId);
+    const currentMember = members.find((m) => m.userId === session.user.id);
+    if (!currentMember) return { error: "You are not a member of this league" };
+
+    // Get all matchups for the week
+    const weekMatchups = await getLeagueMatchups(leagueId, week);
+    const matchup = weekMatchups.find((m) => m.id === matchupId);
+
+    if (!matchup) {
+      return { matchup: null, team1Roster: [], team2Roster: [], team1: null, team2: null };
+    }
+
+    const team1Member = members.find((m) => m.id === matchup.team1MemberId);
+    const team2Member = members.find((m) => m.id === matchup.team2MemberId);
+
+    const [team1Roster, team2Roster] = await Promise.all([
+      getMemberRoster(matchup.team1MemberId),
+      getMemberRoster(matchup.team2MemberId),
+    ]);
+
+    return {
+      matchup,
+      team1Roster,
+      team2Roster,
+      team1: {
+        memberId: matchup.team1MemberId,
+        teamName: team1Member?.teamName || null,
+        userName: team1Member?.userName || team1Member?.userEmail || "Unknown",
+      },
+      team2: {
+        memberId: matchup.team2MemberId,
+        teamName: team2Member?.teamName || null,
+        userName: team2Member?.userName || team2Member?.userEmail || "Unknown",
+      },
+    };
+  } catch (error) {
+    if (error instanceof Error) return { error: error.message };
+    return { error: "Failed to get matchup" };
+  }
+}
+
+export async function getWeekMatchupsAction(leagueId: string, week: number) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { error: "You must be logged in" };
+
+    const members = await getLeagueMembers(leagueId);
+    const currentMember = members.find((m) => m.userId === session.user.id);
+    if (!currentMember) return { error: "You are not a member of this league" };
+
+    const weekMatchups = await getLeagueMatchups(leagueId, week);
+
+    // Enrich matchups with team names
+    const enrichedMatchups = weekMatchups.map((m) => {
+      const team1 = members.find((mem) => mem.id === m.team1MemberId);
+      const team2 = members.find((mem) => mem.id === m.team2MemberId);
+      return {
+        ...m,
+        team1Name: team1?.teamName || team1?.userName || "Unknown",
+        team2Name: team2?.teamName || team2?.userName || "Unknown",
+      };
+    });
+
+    return { matchups: enrichedMatchups };
+  } catch (error) {
+    if (error instanceof Error) return { error: error.message };
+    return { error: "Failed to get week matchups" };
+  }
+}
+
 export async function getLeagueScheduleAction(leagueId: string) {
   try {
     const session = await auth();

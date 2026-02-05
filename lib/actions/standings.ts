@@ -14,6 +14,62 @@ export type TeamStanding = {
   pointsAgainst: number;
 };
 
+export type TeamRecord = {
+  memberId: string;
+  wins: number;
+  losses: number;
+  ties: number;
+};
+
+// Get just the records (wins/losses/ties) for all teams - useful for matchup display
+export async function getTeamRecordsAction(leagueId: string): Promise<{ records: Map<string, TeamRecord> } | { error: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { error: "You must be logged in" };
+
+    const members = await getLeagueMembers(leagueId);
+    const allMatchups = await getScoredMatchups(leagueId);
+
+    const completedMatchups = allMatchups.filter(
+      (m) => m.team1Score !== null && m.team2Score !== null
+    );
+
+    const recordsMap = new Map<string, TeamRecord>();
+    for (const member of members) {
+      recordsMap.set(member.id, {
+        memberId: member.id,
+        wins: 0,
+        losses: 0,
+        ties: 0,
+      });
+    }
+
+    for (const m of completedMatchups) {
+      const t1 = recordsMap.get(m.team1MemberId);
+      const t2 = recordsMap.get(m.team2MemberId);
+      const s1 = m.team1Score!;
+      const s2 = m.team2Score!;
+
+      if (t1) {
+        if (s1 > s2) t1.wins++;
+        else if (s1 < s2) t1.losses++;
+        else t1.ties++;
+      }
+
+      if (t2) {
+        if (s2 > s1) t2.wins++;
+        else if (s2 < s1) t2.losses++;
+        else t2.ties++;
+      }
+    }
+
+    return { records: recordsMap };
+  } catch (error) {
+    if (error instanceof Error) return { error: error.message };
+    return { error: "Failed to get team records" };
+  }
+}
+
 export async function getStandingsAction(leagueId: string) {
   try {
     const session = await auth();
