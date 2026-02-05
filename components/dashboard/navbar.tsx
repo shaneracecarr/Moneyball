@@ -40,6 +40,12 @@ export async function Navbar() {
                     Matchup
                   </Link>
                   <Link
+                    href="/players"
+                    className="text-sm font-medium text-gray-300 hover:text-purple-400 transition-colors"
+                  >
+                    Players
+                  </Link>
+                  <Link
                     href={`/leagues/${activeLeagueId}/standings`}
                     className="text-sm font-medium text-gray-300 hover:text-purple-400 transition-colors"
                   >
@@ -52,12 +58,6 @@ export async function Navbar() {
                     Trades
                   </Link>
                   <Link
-                    href={`/leagues/${activeLeagueId}/inbox`}
-                    className="text-sm font-medium text-gray-300 hover:text-purple-400 transition-colors"
-                  >
-                    Inbox
-                  </Link>
-                  <Link
                     href={`/leagues/${activeLeagueId}/chat`}
                     className="text-sm font-medium text-gray-300 hover:text-purple-400 transition-colors"
                   >
@@ -65,18 +65,6 @@ export async function Navbar() {
                   </Link>
                 </>
               )}
-              <Link
-                href="/players"
-                className="text-sm font-medium text-gray-300 hover:text-purple-400 transition-colors"
-              >
-                Players
-              </Link>
-              <Link
-                href="/mock-draft"
-                className="text-sm font-medium text-gray-300 hover:text-purple-400 transition-colors"
-              >
-                Mock Draft
-              </Link>
               <Link
                 href="/admin"
                 className="text-sm font-medium text-gray-300 hover:text-purple-400 transition-colors"

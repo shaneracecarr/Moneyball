@@ -13,7 +13,7 @@ export function Hero() {
           Create and manage your fantasy football leagues with ease.
           Track your team, compete with friends, and dominate your league.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
           <Link href="/signup">
             <Button size="lg" className="w-full sm:w-auto">
               Get Started
@@ -22,6 +22,13 @@ export function Hero() {
           <Link href="/login">
             <Button size="lg" variant="outline" className="w-full sm:w-auto">
               Sign In
+            </Button>
+          </Link>
+        </div>
+        <div className="mb-12">
+          <Link href="/mock-draft">
+            <Button size="lg" variant="ghost" className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50">
+              Try Mock Draft →
             </Button>
           </Link>
         </div>
