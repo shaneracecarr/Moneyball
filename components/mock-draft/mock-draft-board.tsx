@@ -103,6 +103,11 @@ export function MockDraftBoard({ allPlayers }: MockDraftBoardProps) {
   const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPickRef = useRef(1);
 
+  // Use refs to avoid stale closures in setTimeout
+  const draftedPlayerIdsRef = useRef<Set<string>>(new Set());
+  const currentPickRef = useRef(1);
+  const teamsRef = useRef<TeamInfo[]>([]);
+
   const totalPicks = numberOfTeams * numberOfRounds;
 
   // Who picks at currentPick?
@@ -194,6 +199,19 @@ export function MockDraftBoard({ allPlayers }: MockDraftBoardProps) {
     [sortedPlayers, numberOfTeams, numberOfRounds]
   );
 
+  // Keep refs in sync with state
+  useEffect(() => {
+    draftedPlayerIdsRef.current = draftedPlayerIds;
+  }, [draftedPlayerIds]);
+
+  useEffect(() => {
+    currentPickRef.current = currentPick;
+  }, [currentPick]);
+
+  useEffect(() => {
+    teamsRef.current = teams;
+  }, [teams]);
+
   // Reset timer when pick changes
   useEffect(() => {
     if (currentPick !== lastPickRef.current) {
@@ -211,61 +229,90 @@ export function MockDraftBoard({ allPlayers }: MockDraftBoardProps) {
     return () => clearInterval(interval);
   }, [started, isComplete]);
 
-  // AI auto-pick effect - picks best available by ADP
+  // AI auto-pick function
+  const doAiPick = useCallback(() => {
+    const pickNum = currentPickRef.current;
+    const currentTeams = teamsRef.current;
+    const drafted = draftedPlayerIdsRef.current;
+
+    const { positionInRound, round: r } = getSnakeDraftPosition(pickNum, numberOfTeams);
+    const currentTeam = currentTeams.find((t) => t.position === positionInRound);
+
+    if (!currentTeam || currentTeam.isUser) {
+      setIsAiPicking(false);
+      return;
+    }
+
+    // Find best available player by ADP (not already drafted)
+    const available = allPlayers
+      .filter((p) => !drafted.has(p.id))
+      .sort((a, b) => {
+        if (a.adp === null && b.adp === null) return 0;
+        if (a.adp === null) return 1;
+        if (b.adp === null) return -1;
+        return a.adp - b.adp;
+      });
+
+    if (available.length > 0) {
+      const player = available[0];
+
+      const pick: DraftPick = {
+        memberId: currentTeam.memberId,
+        pickNumber: pickNum,
+        round: r,
+        playerName: player.fullName,
+        playerPosition: player.position,
+        playerTeam: player.team,
+        playerId: player.id,
+      };
+
+      setPicks((prev) => [...prev, pick]);
+      setDraftedPlayerIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.add(player.id);
+        return newSet;
+      });
+
+      const nextPick = pickNum + 1;
+      if (nextPick > numberOfTeams * numberOfRounds) {
+        setIsComplete(true);
+        setIsAiPicking(false);
+      } else {
+        setCurrentPick(nextPick);
+        // Don't set isAiPicking to false here - let the effect handle the next pick
+      }
+    } else {
+      setIsAiPicking(false);
+    }
+  }, [allPlayers, numberOfTeams, numberOfRounds]);
+
+  // AI auto-pick effect - triggers when currentPick changes
   useEffect(() => {
-    // Only run when it's AI's turn
-    if (!started || isComplete || isAiPicking) return;
+    if (!started || isComplete) return;
 
     // Check if current pick belongs to AI
     const { positionInRound } = getSnakeDraftPosition(currentPick, numberOfTeams);
     const currentTeam = teams.find((t) => t.position === positionInRound);
-    if (!currentTeam || currentTeam.isUser) return;
 
+    if (!currentTeam || currentTeam.isUser) {
+      setIsAiPicking(false);
+      return;
+    }
+
+    // It's an AI's turn
     setIsAiPicking(true);
 
     // 2 second delay before AI picks
     aiTimerRef.current = setTimeout(() => {
-      // Find best available player by ADP (not already drafted)
-      const available = allPlayers
-        .filter((p) => !draftedPlayerIds.has(p.id))
-        .sort((a, b) => {
-          if (a.adp === null && b.adp === null) return 0;
-          if (a.adp === null) return 1;
-          if (b.adp === null) return -1;
-          return a.adp - b.adp;
-        });
-
-      if (available.length > 0) {
-        const player = available[0];
-        const { round: r } = getSnakeDraftPosition(currentPick, numberOfTeams);
-
-        const pick: DraftPick = {
-          memberId: currentTeam.memberId,
-          pickNumber: currentPick,
-          round: r,
-          playerName: player.fullName,
-          playerPosition: player.position,
-          playerTeam: player.team,
-          playerId: player.id,
-        };
-
-        setPicks((prev) => [...prev, pick]);
-        setDraftedPlayerIds((prev) => new Set(prev).add(player.id));
-
-        const nextPick = currentPick + 1;
-        if (nextPick > numberOfTeams * numberOfRounds) {
-          setIsComplete(true);
-        } else {
-          setCurrentPick(nextPick);
-        }
-      }
-      setIsAiPicking(false);
+      doAiPick();
     }, 2000);
 
     return () => {
-      if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+      if (aiTimerRef.current) {
+        clearTimeout(aiTimerRef.current);
+      }
     };
-  }, [started, isComplete, isAiPicking, currentPick, numberOfTeams, numberOfRounds, teams, allPlayers, draftedPlayerIds]);
+  }, [started, isComplete, currentPick, numberOfTeams, teams, doAiPick]);
 
   function handleUserPick(playerId: string) {
     if (!isUserTurn) return;
