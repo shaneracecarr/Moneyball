@@ -29,6 +29,11 @@ export default async function DashboardPage() {
       <div className="mb-6 flex justify-between items-center">
         <h2 className="text-2xl font-semibold text-white">Your Leagues</h2>
         <div className="flex gap-3">
+          <Link href="/mock-draft">
+            <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white bg-transparent">
+              Mock Draft
+            </Button>
+          </Link>
           <Link href="/leagues/join">
             <Button variant="outline" className="border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200 bg-transparent">
               Join League
@@ -47,7 +52,7 @@ export default async function DashboardPage() {
           <div className="px-6 py-5 border-b border-gray-700">
             <h3 className="text-lg font-semibold text-white">No Leagues Yet</h3>
             <p className="text-sm text-gray-400 mt-1">
-              You haven&apos;t joined any leagues yet. Create your first league to get started!
+              You haven&apos;t joined any leagues yet. Create a league, join one, or try a mock draft to practice!
             </p>
           </div>
           <div className="px-6 py-4 flex gap-3">
@@ -59,6 +64,11 @@ export default async function DashboardPage() {
             <Link href="/leagues/join">
               <Button variant="outline" className="border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200 bg-transparent">
                 Join a League
+              </Button>
+            </Link>
+            <Link href="/mock-draft">
+              <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white bg-transparent">
+                Try Mock Draft
               </Button>
             </Link>
           </div>
