@@ -2,7 +2,6 @@
 
 import { useState, useTransition, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RosterSection, type RosterEntry, type PlacingPlayer } from "./roster-section";
 import { FreeAgentSearch } from "./free-agent-search";
 import {
@@ -35,6 +34,7 @@ interface TeamRosterPageProps {
   ir: RosterEntry[];
   teamName: string | null;
   slotConfig?: SlotConfig;
+  currentWeek: number;
 }
 
 export function TeamRosterPage({
@@ -44,11 +44,13 @@ export function TeamRosterPage({
   ir,
   teamName,
   slotConfig,
+  currentWeek,
 }: TeamRosterPageProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [placingPlayer, setPlacingPlayer] = useState<PlacingPlayer>(null);
+  const [selectedWeek, setSelectedWeek] = useState(currentWeek);
 
   const starterSlots = slotConfig?.starterSlots ?? DEFAULT_STARTER_SLOTS;
   const benchSlots = slotConfig?.benchSlots ?? DEFAULT_BENCH_SLOTS;
@@ -146,33 +148,54 @@ export function TeamRosterPage({
     allStarterSlots: starterSlots,
     allBenchSlots: benchSlots,
     allIRSlots: irSlots,
+    selectedWeek,
   };
 
   return (
     <div className="space-y-6">
-      {teamName && (
-        <h2 className="text-xl font-bold">{teamName}</h2>
-      )}
+      {/* Team Name and Week Selector */}
+      <div className="flex items-center justify-between">
+        {teamName && (
+          <h2 className="text-xl font-bold text-white">{teamName}</h2>
+        )}
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-400">Viewing:</span>
+          <select
+            value={selectedWeek}
+            onChange={(e) => setSelectedWeek(Number(e.target.value))}
+            className="bg-[#1a1d24] border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            {Array.from({ length: 18 }, (_, i) => i + 1).map((week) => (
+              <option key={week} value={week}>
+                Week {week} {week === currentWeek ? "(Current)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+        <div className="bg-red-500/20 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm">
           {error}
         </div>
       )}
 
       {placingPlayer && (
-        <div className="bg-indigo-50 border border-indigo-200 text-indigo-700 px-4 py-3 rounded-lg text-sm">
+        <div className="bg-purple-500/20 border border-purple-500/50 text-purple-300 px-4 py-3 rounded-lg text-sm">
           Click a highlighted slot to move the player, or press Escape to cancel.
         </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">My Roster ({allRoster.length}/{totalSlots})</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <div className="bg-[#252830] rounded-xl border border-gray-700 overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-700 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white">My Roster</h3>
+                <p className="text-sm text-gray-400 mt-1">{allRoster.length}/{totalSlots} players</p>
+              </div>
+            </div>
+            <div className="px-6 py-5 space-y-6">
               <RosterSection
                 title="Starters"
                 slots={starterSlots}
@@ -191,16 +214,17 @@ export function TeamRosterPage({
                 roster={ir}
                 {...sectionProps}
               />
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
 
         <div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Add Players</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <div className="bg-[#252830] rounded-xl border border-gray-700 overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-700">
+              <h3 className="text-lg font-semibold text-white">Add Players</h3>
+              <p className="text-sm text-gray-400 mt-1">Browse free agents</p>
+            </div>
+            <div className="px-6 py-5">
               <FreeAgentSearch
                 leagueId={leagueId}
                 onPickup={handlePickup}
@@ -209,8 +233,8 @@ export function TeamRosterPage({
                 roster={allRoster}
                 loading={isPending}
               />
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -4,7 +4,6 @@ import { getUserRosterAction } from "@/lib/actions/roster";
 import { getLeagueDetailsAction } from "@/lib/actions/leagues";
 import { getLeagueSettingsAction } from "@/lib/actions/settings";
 import { generateSlotConfig } from "@/lib/roster-config";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TeamRosterPage } from "@/components/roster/team-roster-page";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -19,17 +18,19 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
   if (leagueResult.error || !leagueResult.league) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-            <CardDescription>{leagueResult.error || "Failed to load league"}</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="bg-[#252830] rounded-xl border border-gray-700 overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-700">
+            <h3 className="text-lg font-semibold text-white">Error</h3>
+            <p className="text-sm text-gray-400 mt-1">{leagueResult.error || "Failed to load league"}</p>
+          </div>
+          <div className="px-6 py-4">
             <Link href="/dashboard">
-              <Button variant="outline">Back to Dashboard</Button>
+              <Button variant="outline" className="border-purple-500/50 text-purple-300 hover:bg-purple-500/20 bg-transparent">
+                Back to Dashboard
+              </Button>
             </Link>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
@@ -38,17 +39,19 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
   if (rosterResult.error) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-            <CardDescription>{rosterResult.error}</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="bg-[#252830] rounded-xl border border-gray-700 overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-700">
+            <h3 className="text-lg font-semibold text-white">Error</h3>
+            <p className="text-sm text-gray-400 mt-1">{rosterResult.error}</p>
+          </div>
+          <div className="px-6 py-4">
             <Link href={`/leagues/${params.id}`}>
-              <Button variant="outline">Back to League</Button>
+              <Button variant="outline" className="border-purple-500/50 text-purple-300 hover:bg-purple-500/20 bg-transparent">
+                Back to League
+              </Button>
             </Link>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
@@ -58,15 +61,14 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
     ? generateSlotConfig(settingsResult.settings)
     : undefined;
 
+  const currentWeek = leagueResult.league.currentWeek || 1;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6 flex items-center gap-3">
-        <Link href={`/leagues/${params.id}`}>
-          <Button variant="outline" size="sm">
-            ← Back to League
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-bold">{leagueResult.league.name} - My Team</h1>
+      {/* Page Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-white">{leagueResult.league.name}</h1>
+        <p className="mt-2 text-gray-400">Manage your team roster</p>
       </div>
 
       <TeamRosterPage
@@ -76,6 +78,7 @@ export default async function TeamPage({ params }: { params: { id: string } }) {
         ir={rosterResult.ir || []}
         teamName={rosterResult.teamName || null}
         slotConfig={slotConfig}
+        currentWeek={currentWeek}
       />
     </div>
   );
