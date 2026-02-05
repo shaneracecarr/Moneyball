@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { players, playerGameStats } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { getLeagueMembers, getMemberRoster } from "@/lib/db/queries";
+import { getLeagueMembers, getMemberRoster, isPlayerOnTradeBlock, isPlayerOnWatchlist } from "@/lib/db/queries";
 
 export async function getPlayerCardDataAction(playerId: string) {
   try {
@@ -26,9 +26,14 @@ export async function getPlayerCardDataAction(playerId: string) {
     let ownerTeamName: string | null = null;
     let isOwnedByCurrentUser = false;
     let rosterPlayerId: string | null = null;
+    let isOnTradeBlock = false;
+    let isOnWatchlist = false;
+    let currentMemberId: string | null = null;
 
     if (activeLeagueId) {
       const members = await getLeagueMembers(activeLeagueId);
+      const currentMember = members.find((m) => m.userId === session.user.id);
+      currentMemberId = currentMember?.id || null;
 
       for (const member of members) {
         const roster = await getMemberRoster(member.id);
@@ -41,6 +46,16 @@ export async function getPlayerCardDataAction(playerId: string) {
           }
           break;
         }
+      }
+
+      // Check trade block and watchlist status
+      if (currentMemberId) {
+        const [onTradeBlock, onWatchlist] = await Promise.all([
+          isPlayerOnTradeBlock(currentMemberId, playerId),
+          isPlayerOnWatchlist(currentMemberId, playerId),
+        ]);
+        isOnTradeBlock = onTradeBlock;
+        isOnWatchlist = onWatchlist;
       }
     }
 
@@ -101,6 +116,8 @@ export async function getPlayerCardDataAction(playerId: string) {
       isOwnedByCurrentUser,
       rosterPlayerId,
       activeLeagueId,
+      isOnTradeBlock,
+      isOnWatchlist,
     };
   } catch (error) {
     if (error instanceof Error) return { error: error.message };

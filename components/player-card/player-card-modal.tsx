@@ -73,6 +73,8 @@ export type PlayerCardData = {
   isOwnedByCurrentUser: boolean;
   rosterPlayerId: string | null;
   activeLeagueId: string | null;
+  isOnTradeBlock?: boolean;
+  isOnWatchlist?: boolean;
 };
 
 interface PlayerCardModalProps {
@@ -80,6 +82,10 @@ interface PlayerCardModalProps {
   onClose: () => void;
   onDrop: () => void;
   dropping: boolean;
+  onToggleTradeBlock?: () => void;
+  onToggleWatchlist?: () => void;
+  tradeBlockLoading?: boolean;
+  watchlistLoading?: boolean;
 }
 
 function StatValue({ value, fallback = "X" }: { value: number | string | null | undefined; fallback?: string }) {
@@ -98,9 +104,18 @@ function InfoBox({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export function PlayerCardModal({ data, onClose, onDrop, dropping }: PlayerCardModalProps) {
+export function PlayerCardModal({
+  data,
+  onClose,
+  onDrop,
+  dropping,
+  onToggleTradeBlock,
+  onToggleWatchlist,
+  tradeBlockLoading,
+  watchlistLoading,
+}: PlayerCardModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
-  const { player, gameStats, ownerTeamName, isOwnedByCurrentUser } = data;
+  const { player, gameStats, ownerTeamName, isOwnedByCurrentUser, isOnTradeBlock, isOnWatchlist, activeLeagueId } = data;
 
   // Get unique seasons from game stats
   const seasons = Array.from(new Set(gameStats.map((g) => g.season))).sort((a, b) => b - a);
@@ -234,19 +249,60 @@ export function PlayerCardModal({ data, onClose, onDrop, dropping }: PlayerCardM
                   Free Agent
                 </span>
               )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          {activeLeagueId && (
+            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700">
+              {/* Trade Block Button - only for owned players */}
+              {isOwnedByCurrentUser && onToggleTradeBlock && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`${
+                    isOnTradeBlock
+                      ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/50 hover:bg-yellow-500/30"
+                      : "text-gray-400 border-gray-600 hover:bg-gray-700 hover:text-white"
+                  }`}
+                  onClick={onToggleTradeBlock}
+                  disabled={tradeBlockLoading}
+                >
+                  {tradeBlockLoading ? "..." : isOnTradeBlock ? "On Trade Block" : "Add to Trade Block"}
+                </Button>
+              )}
+
+              {/* Watchlist Button - for players not owned by current user */}
+              {!isOwnedByCurrentUser && onToggleWatchlist && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`${
+                    isOnWatchlist
+                      ? "bg-blue-500/20 text-blue-400 border-blue-500/50 hover:bg-blue-500/30"
+                      : "text-gray-400 border-gray-600 hover:bg-gray-700 hover:text-white"
+                  }`}
+                  onClick={onToggleWatchlist}
+                  disabled={watchlistLoading}
+                >
+                  {watchlistLoading ? "..." : isOnWatchlist ? "On Watchlist" : "Add to Watchlist"}
+                </Button>
+              )}
+
+              {/* Drop Button */}
               {isOwnedByCurrentUser && (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="ml-2 text-red-400 border-red-400/50 hover:bg-red-500/20 hover:text-red-300"
+                  className="text-red-400 border-red-400/50 hover:bg-red-500/20 hover:text-red-300 ml-auto"
                   onClick={onDrop}
                   disabled={dropping}
                 >
-                  {dropping ? "Dropping..." : "Drop"}
+                  {dropping ? "Dropping..." : "Drop Player"}
                 </Button>
               )}
             </div>
-          </div>
+          )}
         </div>
 
         {/* Game Logs Section */}

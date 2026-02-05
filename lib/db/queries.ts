@@ -1,6 +1,6 @@
 import { eq, and, or, like, desc, asc, notInArray, inArray, sql, isNotNull, ne } from "drizzle-orm";
 import { db } from "./index";
-import { users, leagues, leagueMembers, players, drafts, draftOrder, draftPicks, rosterPlayers, matchups, trades, tradeParticipants, tradeItems, notifications, leagueActivity, chatMessages, leagueSettings, mockPlayerStats, waiverPlayers, waiverClaims, faabBalances, waiverOrder } from "./schema";
+import { users, leagues, leagueMembers, players, drafts, draftOrder, draftPicks, rosterPlayers, matchups, trades, tradeParticipants, tradeItems, notifications, leagueActivity, chatMessages, leagueSettings, mockPlayerStats, waiverPlayers, waiverClaims, faabBalances, waiverOrder, tradeBlock, watchlist } from "./schema";
 import { DEFAULT_LEAGUE_SETTINGS, type LeagueSettings } from "../league-settings";
 import { generateSlotConfig } from "../roster-config";
 
@@ -1633,5 +1633,160 @@ export async function updateWaiverOrderFromStandings(leagueId: string, standings
         )
       );
   }
+}
+
+// ============================================================================
+// TRADE BLOCK AND WATCHLIST QUERIES
+// ============================================================================
+
+// Add a player to the trade block
+export async function addToTradeBlock(memberId: string, playerId: string, note?: string) {
+  const result = await db
+    .insert(tradeBlock)
+    .values({ memberId, playerId, note })
+    .onConflictDoUpdate({
+      target: [tradeBlock.memberId, tradeBlock.playerId],
+      set: { note },
+    })
+    .returning();
+  return result[0];
+}
+
+// Remove a player from the trade block
+export async function removeFromTradeBlock(memberId: string, playerId: string) {
+  await db
+    .delete(tradeBlock)
+    .where(
+      and(
+        eq(tradeBlock.memberId, memberId),
+        eq(tradeBlock.playerId, playerId)
+      )
+    );
+}
+
+// Get all players on a member's trade block
+export async function getMemberTradeBlock(memberId: string) {
+  return await db
+    .select({
+      id: tradeBlock.id,
+      playerId: tradeBlock.playerId,
+      playerName: players.fullName,
+      playerPosition: players.position,
+      playerTeam: players.team,
+      note: tradeBlock.note,
+      createdAt: tradeBlock.createdAt,
+    })
+    .from(tradeBlock)
+    .innerJoin(players, eq(tradeBlock.playerId, players.id))
+    .where(eq(tradeBlock.memberId, memberId))
+    .orderBy(desc(tradeBlock.createdAt));
+}
+
+// Get all trade block players in a league (for viewing other teams' trade blocks)
+export async function getLeagueTradeBlock(leagueId: string) {
+  return await db
+    .select({
+      id: tradeBlock.id,
+      memberId: tradeBlock.memberId,
+      playerId: tradeBlock.playerId,
+      playerName: players.fullName,
+      playerPosition: players.position,
+      playerTeam: players.team,
+      note: tradeBlock.note,
+      teamName: leagueMembers.teamName,
+      createdAt: tradeBlock.createdAt,
+    })
+    .from(tradeBlock)
+    .innerJoin(players, eq(tradeBlock.playerId, players.id))
+    .innerJoin(leagueMembers, eq(tradeBlock.memberId, leagueMembers.id))
+    .where(eq(leagueMembers.leagueId, leagueId))
+    .orderBy(desc(tradeBlock.createdAt));
+}
+
+// Check if a player is on the trade block
+export async function isPlayerOnTradeBlock(memberId: string, playerId: string) {
+  const result = await db
+    .select({ id: tradeBlock.id })
+    .from(tradeBlock)
+    .where(
+      and(
+        eq(tradeBlock.memberId, memberId),
+        eq(tradeBlock.playerId, playerId)
+      )
+    )
+    .limit(1);
+  return result.length > 0;
+}
+
+// Add a player to the watchlist
+export async function addToWatchlist(memberId: string, playerId: string) {
+  const result = await db
+    .insert(watchlist)
+    .values({ memberId, playerId })
+    .onConflictDoNothing()
+    .returning();
+  return result[0];
+}
+
+// Remove a player from the watchlist
+export async function removeFromWatchlist(memberId: string, playerId: string) {
+  await db
+    .delete(watchlist)
+    .where(
+      and(
+        eq(watchlist.memberId, memberId),
+        eq(watchlist.playerId, playerId)
+      )
+    );
+}
+
+// Get a member's watchlist
+export async function getMemberWatchlist(memberId: string) {
+  return await db
+    .select({
+      id: watchlist.id,
+      playerId: watchlist.playerId,
+      playerName: players.fullName,
+      playerPosition: players.position,
+      playerTeam: players.team,
+      createdAt: watchlist.createdAt,
+    })
+    .from(watchlist)
+    .innerJoin(players, eq(watchlist.playerId, players.id))
+    .where(eq(watchlist.memberId, memberId))
+    .orderBy(desc(watchlist.createdAt));
+}
+
+// Check if a player is on the watchlist
+export async function isPlayerOnWatchlist(memberId: string, playerId: string) {
+  const result = await db
+    .select({ id: watchlist.id })
+    .from(watchlist)
+    .where(
+      and(
+        eq(watchlist.memberId, memberId),
+        eq(watchlist.playerId, playerId)
+      )
+    )
+    .limit(1);
+  return result.length > 0;
+}
+
+// Get watchlist player IDs for a member (for quick lookup)
+export async function getWatchlistPlayerIds(memberId: string): Promise<string[]> {
+  const result = await db
+    .select({ playerId: watchlist.playerId })
+    .from(watchlist)
+    .where(eq(watchlist.memberId, memberId));
+  return result.map(r => r.playerId);
+}
+
+// Get trade block player IDs for a member (for quick lookup)
+export async function getTradeBlockPlayerIds(memberId: string): Promise<string[]> {
+  const result = await db
+    .select({ playerId: tradeBlock.playerId })
+    .from(tradeBlock)
+    .where(eq(tradeBlock.memberId, memberId));
+  return result.map(r => r.playerId);
 }
 

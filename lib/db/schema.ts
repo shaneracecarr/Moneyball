@@ -513,3 +513,40 @@ export const waiverOrder = pgTable("waiver_order", {
   // One position per member per league
   leagueMemberUnique: unique().on(table.leagueId, table.memberId),
 }));
+
+// ============================================================================
+// TRADE BLOCK AND WATCHLIST TABLES
+// ============================================================================
+
+// Trade block: players marked as available for trade by their owners
+export const tradeBlock = pgTable("trade_block", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  memberId: text("member_id")
+    .notNull()
+    .references(() => leagueMembers.id, { onDelete: "cascade" }),
+  playerId: text("player_id")
+    .notNull()
+    .references(() => players.id, { onDelete: "cascade" }),
+  note: text("note"),
+  createdAt: timestamp("created_at")
+    .notNull()
+    .defaultNow(),
+}, (table) => ({
+  memberPlayerUnique: unique().on(table.memberId, table.playerId),
+}));
+
+// Watchlist: players that users are interested in acquiring
+export const watchlist = pgTable("watchlist", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  memberId: text("member_id")
+    .notNull()
+    .references(() => leagueMembers.id, { onDelete: "cascade" }),
+  playerId: text("player_id")
+    .notNull()
+    .references(() => players.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at")
+    .notNull()
+    .defaultNow(),
+}, (table) => ({
+  memberPlayerUnique: unique().on(table.memberId, table.playerId),
+}));

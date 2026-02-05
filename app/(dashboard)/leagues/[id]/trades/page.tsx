@@ -2,11 +2,8 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getLeagueDetailsAction } from "@/lib/actions/leagues";
 import { getTradesPageDataAction } from "@/lib/actions/trades";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { TradeList } from "@/components/trades/trade-list";
-import { ProposeTradeForm } from "@/components/trades/propose-trade-form";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { getLeagueTradeBlockAction, getMyWatchlistAction } from "@/lib/actions/trade-block";
+import { TradeCenter } from "@/components/trades/trade-center";
 
 export default async function TradesPage({ params }: { params: { id: string } }) {
   const session = await auth();
@@ -18,56 +15,41 @@ export default async function TradesPage({ params }: { params: { id: string } })
   if (leagueResult.error || !leagueResult.league) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-            <CardDescription>{leagueResult.error || "Failed to load league"}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/dashboard">
-              <Button variant="outline">Back to Dashboard</Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="bg-[#252830] rounded-xl border border-gray-700 p-8 text-center">
+          <h2 className="text-xl font-semibold text-white mb-2">Error</h2>
+          <p className="text-gray-400">{leagueResult.error || "Failed to load league"}</p>
+        </div>
       </div>
     );
   }
 
-  const tradesResult = await getTradesPageDataAction(params.id);
+  const [tradesResult, tradeBlockResult, watchlistResult] = await Promise.all([
+    getTradesPageDataAction(params.id),
+    getLeagueTradeBlockAction(params.id),
+    getMyWatchlistAction(params.id),
+  ]);
+
   if (tradesResult.error) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-            <CardDescription>{tradesResult.error}</CardDescription>
-          </CardHeader>
-        </Card>
+        <div className="bg-[#252830] rounded-xl border border-gray-700 p-8 text-center">
+          <h2 className="text-xl font-semibold text-white mb-2">Error</h2>
+          <p className="text-gray-400">{tradesResult.error}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6 flex items-center gap-3">
-        <Link href={`/leagues/${params.id}`}>
-          <Button variant="outline" size="sm">
-            ← Back to League
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-bold">{leagueResult.league.name} - Trades</h1>
-      </div>
-
-      <ProposeTradeForm
+      <TradeCenter
         leagueId={params.id}
+        leagueName={leagueResult.league.name}
         currentMemberId={tradesResult.currentMemberId!}
         memberRosters={tradesResult.memberRosters || []}
-      />
-
-      <TradeList
         trades={tradesResult.trades || []}
-        currentMemberId={tradesResult.currentMemberId!}
-        leagueId={params.id}
+        tradeBlock={tradeBlockResult.players || []}
+        watchlist={watchlistResult.players || []}
       />
     </div>
   );
