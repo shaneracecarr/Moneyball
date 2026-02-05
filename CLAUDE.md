@@ -127,22 +127,26 @@ Tables defined in `lib/db/schema.ts`:
 |-------|---------|
 | `users` | User accounts (email, hashed password, name, isAdmin flag) |
 | `leagues` | Fantasy leagues (name, team count, invite code, currentWeek, phase, isMock) |
-| `league_settings` | Per-league configuration (roster slot counts, scoring format, trade rules) |
+| `league_settings` | Per-league configuration (roster slots, scoring, trades, waiverType, faabBudget) |
 | `league_members` | League membership (leagueId, userId, teamName, isCommissioner, isBot) |
 | `drafts` | Draft instances (status: scheduled/in_progress/completed, round count, current pick) |
 | `draft_order` | Randomized pick order per draft |
 | `draft_picks` | Individual picks made during a draft |
 | `players` | NFL player database (from RapidAPI, keyed by sleeperId, includes ADP, rapidApiId) |
 | `player_game_stats` | Historical game-by-game stats (3 years: 2022-2024, passing/rushing/receiving/kicking/fantasy points) |
-| `roster_players` | Players on team rosters with slot assignments |
+| `roster_players` | Players on team rosters with slot assignments (acquiredVia: draft/free_agent/trade/waiver) |
 | `matchups` | Weekly matchups between teams |
 | `trades` | Trade proposals between league members |
 | `trade_participants` | Members involved in a trade |
 | `trade_items` | Players/picks included in a trade |
 | `notifications` | User notifications for trades |
-| `league_activity` | League activity feed events |
+| `league_activity` | League activity feed events (trade_completed, free_agent_pickup, waiver_claim, player_dropped) |
 | `chat_messages` | League chat/messaging |
 | `mock_player_stats` | Weekly randomly-generated player stats for mock leagues |
+| `waiver_players` | Players currently on waivers in a league |
+| `waiver_claims` | Pending waiver claims submitted by teams |
+| `faab_balances` | FAAB budget tracking per team (for FAAB leagues) |
+| `waiver_order` | Waiver priority order per league (for standard waivers) |
 
 All tables use UUID primary keys and timestamp tracking.
 
@@ -275,6 +279,61 @@ Player data is sourced from the **RapidAPI Tank01 NFL API**. Environment variabl
 - Recipients can accept or decline
 - Trade deadline can be configured in league settings
 - Activity feed tracks completed trades
+
+### Waiver System
+
+The waiver system controls how unrostered players can be acquired. **Mock leagues do NOT have waivers** — all players are free agents with instant pickups.
+
+#### Waiver Types (Regular Leagues Only)
+
+1. **Standard Waivers** (`waiverType: "standard"`)
+   - Waiver priority based on reverse standings (last place = first priority)
+   - After a successful claim, that team moves to the back of the waiver order
+   - Teams submit claims, processed by commissioner
+
+2. **FAAB** (`waiverType: "faab"`)
+   - Free Agent Acquisition Budget — each team gets a season budget (default $100)
+   - Teams submit silent bids on waiver players
+   - Highest bid wins; ties broken by waiver order (reverse standings)
+   - Teams can bid $0
+   - Budget is tracked in `faab_balances` table
+
+#### Player States
+- **On Waivers**: Player was dropped or games ended — must submit claim to acquire
+- **Free Agent**: Player cleared waivers — instant pickup (first come, first served)
+- **Rostered**: Player is on a team's roster
+
+#### Waiver Flow
+1. Player is dropped by a team → goes on waivers (`waiver_players` table)
+2. When games end for the week → all unrostered players go on waivers
+3. Teams submit claims during waiver period (`waiver_claims` table)
+4. Commissioner clicks "Process Waivers" button
+5. Claims awarded based on waiver type (priority or highest bid)
+6. Unclaimed players become free agents (removed from `waiver_players`)
+
+#### Database Tables
+- `waiver_players`: Players currently on waivers (leagueId, playerId, waiverStart, droppedByMemberId)
+- `waiver_claims`: Pending claims (memberId, playerId, bidAmount, priority, dropPlayerId, status)
+- `faab_balances`: FAAB budgets per team (memberId, balance, initialBudget)
+- `waiver_order`: Waiver priority order (memberId, position)
+
+#### League Settings Fields
+```typescript
+waiverType: "none" | "standard" | "faab"  // "none" for mock leagues
+faabBudget: number | null                  // e.g., 100 for $100 budget
+```
+
+#### Key Query Functions (`lib/db/queries.ts`)
+- `isPlayerOnWaivers(leagueId, playerId)` — Check if player is on waivers
+- `addPlayerToWaivers(leagueId, playerId, droppedByMemberId?)` — Put player on waivers
+- `removePlayerFromWaivers(leagueId, playerId)` — Make player a free agent
+- `submitWaiverClaim(...)` — Submit a waiver claim
+- `getPendingWaiverClaims(leagueId)` — Get all pending claims for processing
+- `initializeFaabBalances(leagueId, budget)` — Set up FAAB for all teams
+- `deductFaabBalance(memberId, amount)` — Deduct from FAAB after winning bid
+- `initializeWaiverOrder(leagueId)` — Set initial waiver order
+- `moveToBackOfWaiverOrder(leagueId, memberId)` — After successful standard claim
+- `updateWaiverOrderFromStandings(leagueId, standingsOrder)` — Reset order weekly
 
 ### Mock Draft (Standalone)
 - `/mock-draft` provides a client-side-only mock draft experience against AI opponents
