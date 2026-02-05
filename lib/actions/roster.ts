@@ -154,7 +154,13 @@ export async function movePlayerAction(formData: FormData) {
 
 export async function searchFreeAgentsAction(
   leagueId: string,
-  options: { search?: string; position?: string; limit?: number }
+  options: {
+    search?: string;
+    position?: string;
+    limit?: number;
+    sortBy?: "adp" | "seasonPoints" | "avgPoints";
+    includeRostered?: boolean;
+  }
 ) {
   try {
     const session = await auth();

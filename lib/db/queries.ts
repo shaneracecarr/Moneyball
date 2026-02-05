@@ -499,11 +499,17 @@ export async function getLeagueOwnedPlayerIds(leagueId: string) {
 
 export async function searchFreeAgents(
   leagueId: string,
-  options: { search?: string; position?: string; limit?: number }
+  options: {
+    search?: string;
+    position?: string;
+    limit?: number;
+    sortBy?: "adp" | "seasonPoints" | "avgPoints";
+    includeRostered?: boolean;
+  }
 ) {
-  const { search, position, limit = 50 } = options;
+  const { search, position, limit = 50, sortBy = "adp", includeRostered = false } = options;
 
-  const ownedIds = await getLeagueOwnedPlayerIds(leagueId);
+  const ownedIds = includeRostered ? [] : await getLeagueOwnedPlayerIds(leagueId);
 
   const conditions = [];
   if (ownedIds.length > 0) {
@@ -516,17 +522,41 @@ export async function searchFreeAgents(
     conditions.push(eq(players.position, position));
   }
 
-  let query = db.select().from(players);
+  let query = db.select({
+    id: players.id,
+    fullName: players.fullName,
+    position: players.position,
+    team: players.team,
+    adp: players.adp,
+    seasonPoints: players.seasonPoints,
+  }).from(players);
+
   if (conditions.length > 0) {
     query = query.where(and(...conditions)) as any;
   }
 
-  // Sort by ADP ascending (nulls last), then by name as fallback
-  return query.orderBy(
-    sql`CASE WHEN ${players.adp} IS NULL THEN 1 ELSE 0 END`,
-    asc(players.adp),
-    asc(players.fullName)
-  ).limit(limit);
+  // Sort based on sortBy option
+  if (sortBy === "seasonPoints") {
+    return query.orderBy(
+      sql`CASE WHEN ${players.seasonPoints} IS NULL THEN 1 ELSE 0 END`,
+      desc(players.seasonPoints),
+      asc(players.fullName)
+    ).limit(limit);
+  } else if (sortBy === "avgPoints") {
+    // Average points - sort by seasonPoints descending (same data, different label)
+    return query.orderBy(
+      sql`CASE WHEN ${players.seasonPoints} IS NULL THEN 1 ELSE 0 END`,
+      desc(players.seasonPoints),
+      asc(players.fullName)
+    ).limit(limit);
+  } else {
+    // Default: sort by ADP ascending (nulls last)
+    return query.orderBy(
+      sql`CASE WHEN ${players.adp} IS NULL THEN 1 ELSE 0 END`,
+      asc(players.adp),
+      asc(players.fullName)
+    ).limit(limit);
+  }
 }
 
 export async function addPlayerToRoster(
