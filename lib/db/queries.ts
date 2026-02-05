@@ -1,6 +1,6 @@
 import { eq, and, or, like, desc, asc, notInArray, inArray, sql, isNotNull, ne } from "drizzle-orm";
 import { db } from "./index";
-import { users, leagues, leagueMembers, players, drafts, draftOrder, draftPicks, rosterPlayers, matchups, trades, tradeParticipants, tradeItems, notifications, leagueActivity, chatMessages, leagueSettings, mockPlayerStats, waiverPlayers, waiverClaims, faabBalances, waiverOrder, tradeBlock, watchlist } from "./schema";
+import { users, leagues, leagueMembers, players, drafts, draftOrder, draftPicks, rosterPlayers, matchups, trades, tradeParticipants, tradeItems, notifications, leagueActivity, chatMessages, leagueSettings, mockPlayerStats, waiverPlayers, waiverClaims, faabBalances, waiverOrder, tradeBlock, watchlist, playerGameStats } from "./schema";
 import { DEFAULT_LEAGUE_SETTINGS, type LeagueSettings } from "../league-settings";
 import { generateSlotConfig } from "../roster-config";
 
@@ -284,6 +284,249 @@ export async function countPlayers(options: {
 
 export async function deleteAllPlayers() {
   await db.delete(players);
+}
+
+// Sort field type for players with stats
+export type PlayerStatsSortField =
+  | "adp" | "points" | "name"
+  | "passYards" | "passTds" | "passAttempts" | "passCompletions"
+  | "rushYards" | "rushTds" | "rushAttempts"
+  | "recYards" | "recTds" | "receptions" | "targets"
+  | "fgMade" | "fgAttempts";
+
+export async function searchPlayersWithStats(options: {
+  search?: string;
+  position?: string;
+  team?: string;
+  limit?: number;
+  offset?: number;
+  sort?: PlayerStatsSortField;
+  sortDir?: "asc" | "desc";
+  excludeInactive?: boolean;
+  excludeLeagueId?: string;
+  season?: number;
+}) {
+  const {
+    search,
+    position,
+    team,
+    limit = 50,
+    offset = 0,
+    sort = "adp",
+    sortDir = "asc",
+    excludeInactive = false,
+    excludeLeagueId,
+    season = 2024
+  } = options;
+
+  let excludeIds: string[] = [];
+  if (excludeLeagueId) {
+    excludeIds = await getLeagueOwnedPlayerIds(excludeLeagueId);
+  }
+
+  // Build the aggregated stats subquery
+  const statsSubquery = db
+    .select({
+      playerId: playerGameStats.playerId,
+      gamesPlayed: sql<number>`COUNT(*)`.as("games_played"),
+      // Passing
+      passAttempts: sql<number>`COALESCE(SUM(${playerGameStats.passAttempts}), 0)`.as("pass_attempts"),
+      passCompletions: sql<number>`COALESCE(SUM(${playerGameStats.passCompletions}), 0)`.as("pass_completions"),
+      passYards: sql<number>`COALESCE(SUM(${playerGameStats.passYards}), 0)`.as("pass_yards"),
+      passTds: sql<number>`COALESCE(SUM(${playerGameStats.passTds}), 0)`.as("pass_tds"),
+      passInts: sql<number>`COALESCE(SUM(${playerGameStats.passInts}), 0)`.as("pass_ints"),
+      // Rushing
+      rushAttempts: sql<number>`COALESCE(SUM(${playerGameStats.rushAttempts}), 0)`.as("rush_attempts"),
+      rushYards: sql<number>`COALESCE(SUM(${playerGameStats.rushYards}), 0)`.as("rush_yards"),
+      rushTds: sql<number>`COALESCE(SUM(${playerGameStats.rushTds}), 0)`.as("rush_tds"),
+      // Receiving
+      targets: sql<number>`COALESCE(SUM(${playerGameStats.targets}), 0)`.as("targets"),
+      receptions: sql<number>`COALESCE(SUM(${playerGameStats.receptions}), 0)`.as("receptions"),
+      recYards: sql<number>`COALESCE(SUM(${playerGameStats.recYards}), 0)`.as("rec_yards"),
+      recTds: sql<number>`COALESCE(SUM(${playerGameStats.recTds}), 0)`.as("rec_tds"),
+      // Kicking
+      fgMade: sql<number>`COALESCE(SUM(${playerGameStats.fgMade}), 0)`.as("fg_made"),
+      fgAttempts: sql<number>`COALESCE(SUM(${playerGameStats.fgAttempted}), 0)`.as("fg_attempts"),
+      xpMade: sql<number>`COALESCE(SUM(${playerGameStats.xpMade}), 0)`.as("xp_made"),
+      xpAttempts: sql<number>`COALESCE(SUM(${playerGameStats.xpAttempted}), 0)`.as("xp_attempts"),
+      // Fantasy points (half PPR: 0.5 per reception)
+      fantasyPts: sql<number>`COALESCE(SUM(
+        ${playerGameStats.passTds} * 4 +
+        ${playerGameStats.passYards} * 0.04 +
+        ${playerGameStats.passInts} * -1 +
+        ${playerGameStats.rushTds} * 6 +
+        ${playerGameStats.rushYards} * 0.1 +
+        ${playerGameStats.recTds} * 6 +
+        ${playerGameStats.recYards} * 0.1 +
+        ${playerGameStats.receptions} * 0.5 +
+        ${playerGameStats.fgMade} * 3 +
+        ${playerGameStats.xpMade} * 1
+      ), 0)`.as("fantasy_pts"),
+    })
+    .from(playerGameStats)
+    .where(eq(playerGameStats.season, season))
+    .groupBy(playerGameStats.playerId)
+    .as("stats");
+
+  // Build player conditions
+  const conditions = [];
+  if (search) {
+    conditions.push(like(players.fullName, `%${search}%`));
+  }
+  if (position) {
+    conditions.push(eq(players.position, position));
+  }
+  if (team) {
+    conditions.push(eq(players.team, team));
+  }
+  if (excludeInactive) {
+    conditions.push(isNotNull(players.team));
+  }
+  if (excludeIds.length > 0) {
+    conditions.push(notInArray(players.id, excludeIds));
+  }
+
+  // Build order clause based on sort field
+  const orderDir = sortDir === "desc" ? desc : asc;
+  const nullsLast = sortDir === "desc"
+    ? sql`CASE WHEN ${statsSubquery.fantasyPts} IS NULL THEN 1 ELSE 0 END`
+    : sql`CASE WHEN ${players.adp} IS NULL THEN 1 ELSE 0 END`;
+
+  let orderClauses;
+  switch (sort) {
+    case "adp":
+      orderClauses = [
+        sql`CASE WHEN ${players.adp} IS NULL THEN 1 ELSE 0 END`,
+        sortDir === "desc" ? desc(players.adp) : asc(players.adp),
+      ];
+      break;
+    case "points":
+      orderClauses = [
+        sql`CASE WHEN ${statsSubquery.fantasyPts} IS NULL OR ${statsSubquery.fantasyPts} = 0 THEN 1 ELSE 0 END`,
+        sortDir === "desc" ? desc(statsSubquery.fantasyPts) : asc(statsSubquery.fantasyPts),
+      ];
+      break;
+    case "name":
+      orderClauses = [sortDir === "desc" ? desc(players.fullName) : asc(players.fullName)];
+      break;
+    case "passYards":
+      orderClauses = [
+        sql`CASE WHEN ${statsSubquery.passYards} IS NULL THEN 1 ELSE 0 END`,
+        orderDir(statsSubquery.passYards),
+      ];
+      break;
+    case "passTds":
+      orderClauses = [
+        sql`CASE WHEN ${statsSubquery.passTds} IS NULL THEN 1 ELSE 0 END`,
+        orderDir(statsSubquery.passTds),
+      ];
+      break;
+    case "rushYards":
+      orderClauses = [
+        sql`CASE WHEN ${statsSubquery.rushYards} IS NULL THEN 1 ELSE 0 END`,
+        orderDir(statsSubquery.rushYards),
+      ];
+      break;
+    case "rushTds":
+      orderClauses = [
+        sql`CASE WHEN ${statsSubquery.rushTds} IS NULL THEN 1 ELSE 0 END`,
+        orderDir(statsSubquery.rushTds),
+      ];
+      break;
+    case "rushAttempts":
+      orderClauses = [
+        sql`CASE WHEN ${statsSubquery.rushAttempts} IS NULL THEN 1 ELSE 0 END`,
+        orderDir(statsSubquery.rushAttempts),
+      ];
+      break;
+    case "recYards":
+      orderClauses = [
+        sql`CASE WHEN ${statsSubquery.recYards} IS NULL THEN 1 ELSE 0 END`,
+        orderDir(statsSubquery.recYards),
+      ];
+      break;
+    case "recTds":
+      orderClauses = [
+        sql`CASE WHEN ${statsSubquery.recTds} IS NULL THEN 1 ELSE 0 END`,
+        orderDir(statsSubquery.recTds),
+      ];
+      break;
+    case "receptions":
+      orderClauses = [
+        sql`CASE WHEN ${statsSubquery.receptions} IS NULL THEN 1 ELSE 0 END`,
+        orderDir(statsSubquery.receptions),
+      ];
+      break;
+    case "targets":
+      orderClauses = [
+        sql`CASE WHEN ${statsSubquery.targets} IS NULL THEN 1 ELSE 0 END`,
+        orderDir(statsSubquery.targets),
+      ];
+      break;
+    case "fgMade":
+      orderClauses = [
+        sql`CASE WHEN ${statsSubquery.fgMade} IS NULL THEN 1 ELSE 0 END`,
+        orderDir(statsSubquery.fgMade),
+      ];
+      break;
+    default:
+      orderClauses = [
+        sql`CASE WHEN ${players.adp} IS NULL THEN 1 ELSE 0 END`,
+        asc(players.adp),
+      ];
+  }
+
+  // Main query with left join to stats
+  let query = db
+    .select({
+      id: players.id,
+      sleeperId: players.sleeperId,
+      fullName: players.fullName,
+      firstName: players.firstName,
+      lastName: players.lastName,
+      team: players.team,
+      position: players.position,
+      status: players.status,
+      injuryStatus: players.injuryStatus,
+      age: players.age,
+      yearsExp: players.yearsExp,
+      number: players.number,
+      adp: players.adp,
+      seasonPoints: players.seasonPoints,
+      headshotUrl: players.headshotUrl,
+      // Stats from subquery
+      gamesPlayed: statsSubquery.gamesPlayed,
+      passAttempts: statsSubquery.passAttempts,
+      passCompletions: statsSubquery.passCompletions,
+      passYards: statsSubquery.passYards,
+      passTds: statsSubquery.passTds,
+      passInts: statsSubquery.passInts,
+      rushAttempts: statsSubquery.rushAttempts,
+      rushYards: statsSubquery.rushYards,
+      rushTds: statsSubquery.rushTds,
+      targets: statsSubquery.targets,
+      receptions: statsSubquery.receptions,
+      recYards: statsSubquery.recYards,
+      recTds: statsSubquery.recTds,
+      fgMade: statsSubquery.fgMade,
+      fgAttempts: statsSubquery.fgAttempts,
+      xpMade: statsSubquery.xpMade,
+      xpAttempts: statsSubquery.xpAttempts,
+      fantasyPts: statsSubquery.fantasyPts,
+    })
+    .from(players)
+    .leftJoin(statsSubquery, eq(players.id, statsSubquery.playerId));
+
+  if (conditions.length > 0) {
+    query = query.where(and(...conditions)) as any;
+  }
+
+  const result = await (query as any)
+    .orderBy(...orderClauses)
+    .limit(limit)
+    .offset(offset);
+
+  return result;
 }
 
 // Draft queries
