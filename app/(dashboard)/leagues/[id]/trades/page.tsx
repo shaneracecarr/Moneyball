@@ -14,7 +14,7 @@ export default async function TradesPage({ params }: { params: { id: string } })
   const leagueResult = await getLeagueDetailsAction(params.id);
   if (leagueResult.error || !leagueResult.league) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="bg-[#252830] rounded-xl border border-gray-700 p-8 text-center">
           <h2 className="text-xl font-semibold text-white mb-2">Error</h2>
           <p className="text-gray-400">{leagueResult.error || "Failed to load league"}</p>
@@ -31,7 +31,7 @@ export default async function TradesPage({ params }: { params: { id: string } })
 
   if (tradesResult.error) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="bg-[#252830] rounded-xl border border-gray-700 p-8 text-center">
           <h2 className="text-xl font-semibold text-white mb-2">Error</h2>
           <p className="text-gray-400">{tradesResult.error}</p>
@@ -41,7 +41,7 @@ export default async function TradesPage({ params }: { params: { id: string } })
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
       <TradeCenter
         leagueId={params.id}
         leagueName={leagueResult.league.name}

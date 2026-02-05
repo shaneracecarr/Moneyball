@@ -408,10 +408,10 @@ export function TradeCenter({
           {/* League Roster Grid */}
           <div className="bg-[#1a1d24] rounded-xl border border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-max">
+              <table className="w-full table-fixed">
                 <thead>
                   <tr className="border-b border-gray-700">
-                    <th className="sticky left-0 bg-[#252830] px-3 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide w-16 z-10">
+                    <th className="sticky left-0 bg-[#252830] px-1 py-2 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide w-10 z-10">
                       Pos
                     </th>
                     {memberRosters.map((member) => {
@@ -420,7 +420,7 @@ export function TradeCenter({
                       return (
                         <th
                           key={member.memberId}
-                          className={`px-2 py-3 text-center min-w-[140px] transition-colors ${
+                          className={`px-1 py-2 text-center transition-colors ${
                             isMe
                               ? "bg-purple-600/20"
                               : isSelected
@@ -429,18 +429,14 @@ export function TradeCenter({
                           }`}
                           onClick={() => !isMe && togglePartnerSelection(member.memberId)}
                         >
-                          <div className="flex flex-col items-center gap-1">
-                            <span className={`text-sm font-semibold ${isMe ? "text-purple-300" : isSelected ? "text-green-300" : "text-white"}`}>
-                              {member.teamName || member.userName}
-                            </span>
-                            {isMe ? (
-                              <span className="text-[10px] text-purple-400 uppercase">You</span>
-                            ) : isSelected ? (
-                              <span className="text-[10px] text-green-400 uppercase">Selected ✓</span>
-                            ) : (
-                              <span className="text-[10px] text-gray-500 uppercase">Click to select</span>
-                            )}
-                          </div>
+                          <span className={`text-xs font-semibold truncate block ${isMe ? "text-purple-300" : isSelected ? "text-green-300" : "text-white"}`}>
+                            {member.teamName || member.userName}
+                          </span>
+                          {isMe ? (
+                            <span className="text-[9px] text-purple-400">You</span>
+                          ) : isSelected ? (
+                            <span className="text-[9px] text-green-400">✓</span>
+                          ) : null}
                         </th>
                       );
                     })}
@@ -452,16 +448,12 @@ export function TradeCenter({
                     return Array.from({ length: maxCount }).map((_, idx) => (
                       <tr
                         key={`${position}-${idx}`}
-                        className={`border-b border-gray-800 ${idx === 0 ? "border-t border-gray-700" : ""}`}
+                        className="border-b border-gray-800/50"
                       >
                         {/* Position label (only on first row of each position) */}
-                        <td
-                          className={`sticky left-0 bg-[#1e2128] px-3 py-2 z-10 ${
-                            idx === 0 ? "" : "border-t-0"
-                          }`}
-                        >
+                        <td className="sticky left-0 bg-[#1e2128] px-1 py-0.5 z-10">
                           {idx === 0 && (
-                            <span className={`inline-flex items-center justify-center w-10 h-7 rounded text-xs font-bold text-white ${POSITION_BG[position]}`}>
+                            <span className={`inline-flex items-center justify-center w-8 h-5 rounded text-[10px] font-bold text-white ${POSITION_BG[position]}`}>
                               {position}
                             </span>
                           )}
@@ -479,32 +471,31 @@ export function TradeCenter({
                           return (
                             <td
                               key={member.memberId}
-                              className={`px-2 py-1.5 ${
+                              className={`px-0.5 py-0.5 ${
                                 isMe ? "bg-purple-600/5" : isSelected ? "bg-green-600/5" : ""
                               }`}
                             >
                               {player ? (
                                 <div
-                                  className={`px-2 py-1.5 rounded-lg border ${POSITION_BORDER[position]} bg-[#252830] hover:bg-[#2a2f3a] transition-colors`}
+                                  className={`px-1 py-0.5 rounded border ${POSITION_BORDER[position]} bg-[#252830] hover:bg-[#2a2f3a] transition-colors`}
                                 >
-                                  <div className="flex items-center gap-1.5">
+                                  <div className="flex items-center gap-1">
                                     <PlayerNameLink
                                       playerId={player.playerId}
                                       playerName={player.playerName}
-                                      className="text-sm text-white hover:text-purple-400 truncate flex-1"
+                                      className="text-[11px] text-white hover:text-purple-400 truncate flex-1 leading-tight"
                                     />
                                     {isOnTradeBlock && (
-                                      <span className="w-2 h-2 rounded-full bg-yellow-500" title="On Trade Block" />
+                                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 flex-shrink-0" title="On Trade Block" />
                                     )}
                                     {isOnWatchlist && (
-                                      <span className="w-2 h-2 rounded-full bg-blue-500" title="On Watchlist" />
+                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" title="On Watchlist" />
                                     )}
                                   </div>
-                                  <p className="text-[10px] text-gray-500">{player.playerTeam || "FA"}</p>
                                 </div>
                               ) : (
-                                <div className="px-2 py-1.5 rounded-lg border border-gray-800 bg-[#1a1d24]">
-                                  <p className="text-xs text-gray-600">—</p>
+                                <div className="px-1 py-0.5 rounded border border-gray-800/50 bg-[#1a1d24]">
+                                  <p className="text-[10px] text-gray-700 leading-tight">—</p>
                                 </div>
                               )}
                             </td>
