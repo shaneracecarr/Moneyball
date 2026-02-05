@@ -11,6 +11,7 @@ import {
   updateRosterSlot,
   removeRosterPlayer,
   getFirstOpenBenchSlot,
+  getFirstOpenSlotForPlayer,
   getRosterPlayerBySlot,
   getPlayerById,
   createLeagueActivityEvent,
@@ -187,16 +188,21 @@ export async function pickupPlayerAction(formData: FormData) {
     const member = await getMemberForUser(session.user.id, validated.leagueId);
     if (!member) return { error: "You are not a member of this league" };
 
+    // Get player info first to know their position
+    const player = await getPlayerById(validated.playerId);
+    if (!player) return { error: "Player not found" };
+
     const slotConfig = await getSlotConfigForLeague(validated.leagueId);
-    const openSlot = await getFirstOpenBenchSlot(member.id, slotConfig.benchSlots);
+
+    // Find any open slot (bench first, then starter slots for this position)
+    const openSlot = await getFirstOpenSlotForPlayer(member.id, player.position, slotConfig);
     if (!openSlot) {
-      return { error: "No open bench slots. You must drop a player first.", needsDrop: true };
+      return { error: "No open roster slots. You must drop a player first.", needsDrop: true };
     }
 
     await addPlayerToRoster(member.id, validated.playerId, openSlot, "free_agent");
 
     // Create activity feed event and system chat message
-    const player = await getPlayerById(validated.playerId);
     if (player) {
       await createLeagueActivityEvent({
         leagueId: validated.leagueId,

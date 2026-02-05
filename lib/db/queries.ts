@@ -597,6 +597,36 @@ export async function getFirstOpenBenchSlot(memberId: string, benchSlots?: strin
   return null;
 }
 
+// Find any open roster slot for a player (checks bench first, then eligible starter slots)
+export async function getFirstOpenSlotForPlayer(
+  memberId: string,
+  playerPosition: string,
+  slotConfig: {
+    benchSlots: string[];
+    positionToStarterSlots: Record<string, string[]>;
+  }
+): Promise<string | null> {
+  const roster = await db
+    .select({ slot: rosterPlayers.slot })
+    .from(rosterPlayers)
+    .where(eq(rosterPlayers.memberId, memberId));
+
+  const occupiedSlots = new Set(roster.map((r) => r.slot));
+
+  // First, try bench slots (preferred for pickups)
+  for (const slot of slotConfig.benchSlots) {
+    if (!occupiedSlots.has(slot)) return slot;
+  }
+
+  // If bench is full, try starter slots that can accept this position
+  const eligibleStarterSlots = slotConfig.positionToStarterSlots[playerPosition] || [];
+  for (const slot of eligibleStarterSlots) {
+    if (!occupiedSlots.has(slot)) return slot;
+  }
+
+  return null;
+}
+
 export async function getFirstOpenIRSlot(memberId: string, irSlots?: string[]) {
   const roster = await db
     .select({ slot: rosterPlayers.slot })

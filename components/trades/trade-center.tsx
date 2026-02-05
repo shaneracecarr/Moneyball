@@ -411,9 +411,6 @@ export function TradeCenter({
               <table className="w-full table-fixed">
                 <thead>
                   <tr className="border-b border-gray-700">
-                    <th className="sticky left-0 bg-[#252830] px-1 py-2 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide w-10 z-10">
-                      Pos
-                    </th>
                     {memberRosters.map((member) => {
                       const isMe = member.memberId === currentMemberId;
                       const isSelected = selectedPartners.has(member.memberId);
@@ -450,15 +447,6 @@ export function TradeCenter({
                         key={`${position}-${idx}`}
                         className="border-b border-gray-800/50"
                       >
-                        {/* Position label (only on first row of each position) */}
-                        <td className="sticky left-0 bg-[#1e2128] px-1 py-0.5 z-10">
-                          {idx === 0 && (
-                            <span className={`inline-flex items-center justify-center w-8 h-5 rounded text-[10px] font-bold text-white ${POSITION_BG[position]}`}>
-                              {position}
-                            </span>
-                          )}
-                        </td>
-                        {/* Player cells for each team */}
                         {memberRosters.map((member) => {
                           const playersByPos = getPlayersByPosition(member.roster);
                           const players = playersByPos[position] || [];
