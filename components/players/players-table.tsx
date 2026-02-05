@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { pickupPlayerAction } from "@/lib/actions/roster";
 import { PlayerNameLink } from "@/components/player-card/player-name-link";
 
@@ -49,6 +49,9 @@ interface PlayersTableProps {
   currentSort: string;
   currentSortDir: string;
   currentPosition: string;
+  currentSearch?: string;
+  currentTeam?: string;
+  currentAvailability?: string;
 }
 
 const POSITION_COLORS: Record<string, string> = {
@@ -69,9 +72,11 @@ export function PlayersTable({
   currentSort,
   currentSortDir,
   currentPosition,
+  currentSearch = "",
+  currentTeam = "",
+  currentAvailability = "all",
 }: PlayersTableProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [actionPlayerId, setActionPlayerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +85,13 @@ export function PlayersTable({
   const ownedSet = new Set(ownedPlayerIds);
 
   function handleSort(field: SortField) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams();
+
+    // Preserve existing filters
+    if (currentSearch) params.set("search", currentSearch);
+    if (currentPosition) params.set("position", currentPosition);
+    if (currentTeam) params.set("team", currentTeam);
+    if (currentAvailability !== "all") params.set("availability", currentAvailability);
 
     // Determine new sort direction
     let newDir: string;
@@ -311,14 +322,14 @@ export function PlayersTable({
                     {/* ADP */}
                     <td className="px-2 py-2 text-right">
                       <span className="text-sm font-medium text-white tabular-nums">
-                        {player.adp ? player.adp.toFixed(1) : "-"}
+                        {player.adp ? Number(player.adp).toFixed(1) : "-"}
                       </span>
                     </td>
 
                     {/* Fantasy Points */}
                     <td className="px-2 py-2 text-right">
                       <span className="text-sm font-semibold text-purple-400 tabular-nums">
-                        {player.fantasyPts ? player.fantasyPts.toFixed(1) : "-"}
+                        {player.fantasyPts ? Number(player.fantasyPts).toFixed(1) : "-"}
                       </span>
                     </td>
 

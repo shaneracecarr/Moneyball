@@ -139,6 +139,9 @@ export default async function PlayersPage({
         currentSort={sort}
         currentSortDir={sortDir}
         currentPosition={position}
+        currentSearch={search}
+        currentTeam={team}
+        currentAvailability={availability}
       />
 
       {/* Pagination */}

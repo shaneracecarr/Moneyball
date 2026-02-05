@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 
 interface PlayersFiltersProps {
@@ -32,7 +32,6 @@ export function PlayersFilters({
   hasActiveLeague,
 }: PlayersFiltersProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [search, setSearch] = useState(currentSearch);
 
   useEffect(() => {
