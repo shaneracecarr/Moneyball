@@ -1,10 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { getChatMessagesAction, postChatMessageAction } from "@/lib/actions/chat";
 import { ChatMessage } from "./chat-message";
 
@@ -40,7 +36,6 @@ export function ChatRoom({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -96,8 +91,8 @@ export function ChatRoom({
   }
 
   return (
-    <Card className="flex flex-col h-[600px]">
-      <CardContent className="flex flex-col h-full p-4">
+    <div className="flex flex-col h-[600px] bg-[#252830] rounded-xl border border-gray-700 overflow-hidden">
+      <div className="flex flex-col h-full p-4">
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto mb-4 space-y-3 pr-2">
           {messages.length === 0 ? (
@@ -118,35 +113,40 @@ export function ChatRoom({
 
         {/* Error display */}
         {error && (
-          <div className="mb-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+          <div className="mb-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded px-3 py-2">
             {error}
           </div>
         )}
 
         {/* Input area */}
         <div className="flex gap-2">
-          <Input
+          <input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             maxLength={500}
             disabled={isPending}
-            className="flex-1"
+            className="flex-1 bg-[#1a1d24] border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
           />
-          <Button
+          <button
             onClick={handleSend}
             disabled={!inputValue.trim() || isPending}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isPending ? "Sending..." : "Send"}
-          </Button>
-          <Button variant="outline" onClick={handleRefresh} title="Refresh messages">
+          </button>
+          <button
+            onClick={handleRefresh}
+            title="Refresh messages"
+            className="px-3 py-2 bg-[#1a1d24] border border-gray-600 text-gray-400 rounded-lg hover:bg-gray-700 hover:text-white transition-colors"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-          </Button>
+          </button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
