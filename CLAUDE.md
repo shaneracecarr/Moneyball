@@ -597,18 +597,77 @@ Each position has consistent colors for badges, borders, and backgrounds:
     <tr className="border-t border-gray-600 bg-[#252830] font-semibold">  {/* Totals row */}
 ```
 
-#### When to Use Dark Theme
-- **Player cards** and detailed stat views
-- **Modals/dialogs** with lots of data
-- **Game logs** and historical data tables
-- **Draft boards** (immersive full-screen experiences)
-- **Matchup views** with head-to-head comparisons
+#### App-Wide Dark Theme
 
-#### When to Use Light Theme (existing)
-- **Dashboard** and navigation
-- **Settings pages** and forms
-- **Simple lists** and league overviews
-- **Admin pages**
+The entire app uses the dark theme. All pages should follow this pattern.
+
+#### Applying Dark Theme to Pages
+
+**Layout (`app/(dashboard)/layout.tsx`):**
+```tsx
+<div className="min-h-screen bg-[#1a1d24]">
+  <Navbar />
+  {children}
+</div>
+```
+
+**Navbar (`components/dashboard/navbar.tsx`):**
+- Background: `bg-[#1e2128]` (elevated surface)
+- Border: `border-b border-gray-700`
+- Logo: `text-purple-400 hover:text-purple-300` (purple branding)
+- Nav links: `text-gray-300 hover:text-purple-400 transition-colors`
+- Active league badge: `bg-purple-500/20 text-purple-300 border border-purple-500/30`
+- Sign out button: `border-gray-600 text-gray-300 hover:bg-gray-700 bg-transparent`
+
+**Page Content:**
+- Headings: `text-white`
+- Subtext/descriptions: `text-gray-400`
+- Primary buttons: `bg-purple-600 hover:bg-purple-700 text-white`
+- Outline buttons: `border-purple-500/50 text-purple-300 hover:bg-purple-500/20 bg-transparent`
+
+**Cards (replacing shadcn Card component with custom dark styling):**
+```tsx
+<div className="bg-[#252830] rounded-xl border border-gray-700 overflow-hidden">
+  <div className="px-6 py-5 border-b border-gray-700">  {/* Header */}
+    <h3 className="text-lg font-semibold text-white">Title</h3>
+    <p className="text-sm text-gray-400 mt-1">Description</p>
+  </div>
+  <div className="px-6 py-4">  {/* Body */}
+    {/* Content */}
+  </div>
+</div>
+```
+
+**Interactive Cards (clickable, like league cards):**
+```tsx
+<div className={`bg-[#252830] rounded-xl border transition-all cursor-pointer hover:bg-[#2a2f38] ${
+  isActive
+    ? "border-purple-500 shadow-lg shadow-purple-500/20"  // Active state
+    : "border-gray-700 hover:border-gray-600"              // Default state
+}`}>
+```
+
+**Status Badges (semi-transparent backgrounds):**
+```tsx
+// Phase/status badges
+"bg-gray-500/20 text-gray-300"    // Default/setup
+"bg-amber-500/20 text-amber-400"  // Warning/drafting
+"bg-green-500/20 text-green-400"  // Success/active
+"bg-blue-500/20 text-blue-400"    // Info/in-progress
+"bg-purple-500/20 text-purple-400" // Complete/special
+
+// Feature badges (Mock, Active, etc.)
+"bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full text-xs font-medium"
+```
+
+**Key Principles:**
+1. Use `#1a1d24` as the base page background
+2. Use `#1e2128` for elevated surfaces (navbar, raised sections)
+3. Use `#252830` for cards and prominent containers
+4. Keep purple (`purple-400`, `purple-500`, `purple-600`) as the accent color
+5. Text hierarchy: `text-white` (headings) → `text-gray-300` (body) → `text-gray-400` (muted)
+6. Borders: `border-gray-700` (default) → `border-gray-600` (hover)
+7. Interactive states use purple glow: `shadow-purple-500/20`
 
 ## Supabase + Vercel Connection (CRITICAL)
 
