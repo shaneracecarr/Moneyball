@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { searchPlayersWithStats, countPlayers, getPlayerCount, getLeagueOwnedPlayerIds, type PlayerStatsSortField } from "@/lib/db/queries";
+import { searchPlayersWithStats, countPlayers, getLeagueOwnedPlayerIds, type PlayerStatsSortField } from "@/lib/db/queries";
 import { PlayersTable } from "@/components/players/players-table";
 import { PlayersFilters } from "@/components/players/players-filters";
 import Link from "next/link";
@@ -82,9 +82,6 @@ export default async function PlayersPage({
   });
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-  // Get total player count for display
-  const totalPlayers = await getPlayerCount();
-
   // Build pagination URL params
   const buildPageUrl = (p: number) => {
     const params = new URLSearchParams();
@@ -103,12 +100,7 @@ export default async function PlayersPage({
     <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
       {/* Header */}
       <div className="mb-6 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-white">NFL Players</h1>
-          <p className="mt-1 text-sm text-gray-400">
-            {totalCount.toLocaleString()} players{showFreeAgentsOnly ? " available" : ""} · {totalPlayers.toLocaleString()} total
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold text-white">NFL Players</h1>
         <div className="flex items-center gap-3">
           {activeLeagueName ? (
             <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-1.5 rounded-lg">
