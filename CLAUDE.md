@@ -338,9 +338,30 @@ faabBudget: number | null                  // e.g., 100 for $100 budget
 ### Mock Draft (Standalone)
 - `/mock-draft` provides a client-side-only mock draft experience against AI opponents
 - No database persistence — draft state lives entirely in React component state
-- Setup form: team count, rounds, draft position
-- AI uses position-priority strategy by round (early rounds: RB/WR, mid rounds: add QB/TE, late rounds: K/DEF)
-- After draft completion, shows summary with all picks; user can start a new mock draft
+- **Matches regular draft UI**: Same dark theme grid layout with team columns and round rows
+- Dashboard has "Mock Draft" button alongside Create/Join league buttons
+
+#### Setup (`mock-draft-setup.tsx`)
+- Dark theme form with team count (4-14), rounds (1-20), draft position
+- Draft order preview showing user's position highlighted
+- Purple accent buttons matching app theme
+
+#### Draft Board (`mock-draft-board.tsx`)
+- **Grid layout**: Teams as columns, rounds as rows (snake draft order)
+- **Timer**: 90-second countdown per pick with visual warnings (yellow at 30s, red at 10s)
+- **AI auto-picking**: 2-second delay, selects best available player by ADP
+- **Position colors**: QB=red, RB=emerald, WR=sky, TE=amber, K=purple, DEF=orange
+- **Status indicators**: "AI PICKING..." (animated), "AI TURN", "YOUR PICK"
+- **On Clock highlighting**: Indigo ring around current pick cell
+- **Column badges**: "YOU" for user team, "AI" for AI teams
+- **Player list panel**: Right sidebar with search, position filters, draft buttons
+- **Complete view**: Full draft grid showing all picks
+
+#### Technical Implementation
+- Uses `useRef` to track state (`draftedPlayerIdsRef`, `currentPickRef`, `teamsRef`) to avoid stale closures in `setTimeout` callbacks
+- Separate `doAiPick` callback reads from refs when timeout fires
+- Effect triggers on `currentPick` changes and schedules 2-second delay
+- Players sorted by ADP for AI selection (lowest ADP = best)
 
 ### Bot Teams System
 - **Bot teams** are AI-controlled league members that act autonomously
@@ -470,6 +491,62 @@ faabBudget: number | null                  // e.g., 100 for $100 budget
 - When active league selected, shows: League, Team, Matchup, Standings, Trades, Inbox, Chat
 - "My Teams" page (`/my-teams`) lists all user's leagues with roster fill counts and links to manage each team
 - League detail page has "My Team" button linking to `/leagues/[id]/team` and "Settings" button linking to `/leagues/[id]/settings`
+- Dashboard page has action buttons: "Mock Draft", "Join League", "Create League"
+
+### Players Page (`/players`)
+
+The players page displays all NFL players with aggregated season stats, sortable columns, and filtering.
+
+#### Features
+- **Dark theme**: Matches app-wide dark theme with `bg-[#1a1d24]` base
+- **Position tabs**: ALL, QB, RB, WR, TE, K, DEF filter buttons
+- **Search**: Find players by name
+- **Team filter**: Dropdown to filter by NFL team
+- **Free agents toggle**: Show only unrostered players (requires active league)
+- **Sortable columns**: Click column headers to sort (arrow indicator shows direction)
+- **Add to Team**: Button appears for unrostered players when league is active
+
+#### Stats Display
+- **ADP**: Average Draft Position
+- **Fantasy Points**: Season total (half-PPR calculated)
+- **Position-specific columns**:
+  - **Passing** (QB): Completions, Attempts, Yards, TDs
+  - **Rushing** (QB, RB): Attempts, Yards, TDs
+  - **Receiving** (RB, WR, TE): Targets, Receptions, Yards, TDs
+  - **Kicking** (K): FG Made/Attempted, XP Made/Attempted
+
+#### Query Function (`lib/db/queries.ts`)
+```typescript
+export type PlayerStatsSortField =
+  | "adp" | "points" | "name"
+  | "passYards" | "passTds" | "passAttempts" | "passCompletions"
+  | "rushYards" | "rushTds" | "rushAttempts"
+  | "recYards" | "recTds" | "receptions" | "targets"
+  | "fgMade" | "fgAttempts";
+
+export async function searchPlayersWithStats(options: {
+  search?: string;
+  position?: string;
+  team?: string;
+  limit?: number;
+  offset?: number;
+  sort?: PlayerStatsSortField;
+  sortDir?: "asc" | "desc";
+  excludeInactive?: boolean;
+  excludeLeagueId?: string;
+  season?: number;
+})
+```
+
+- Aggregates stats from `player_game_stats` table (current season)
+- Calculates fantasy points using half-PPR formula
+- Supports sorting by any stat column
+- Excludes rostered players when `excludeLeagueId` is provided
+
+#### Component Architecture
+- **Server Component** (`app/(dashboard)/players/page.tsx`): Fetches data, passes URL params as props
+- **Client Components**: `PlayersFilters` and `PlayersTable` receive params as props (not `useSearchParams()`)
+- Avoids React hydration errors by not using browser-only hooks during SSR
 
 ### Player Card Modal
 
