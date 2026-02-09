@@ -169,12 +169,42 @@ leagueMembers = pgTable("league_members", {
 
 ## Key Implementation Details
 
-### Authentication
-- Uses NextAuth v5 (beta) with credentials provider
-- Passwords hashed with bcrypt (10 rounds)
-- JWT sessions stored in HTTP-only cookies
-- Session includes user ID via custom JWT/session callbacks
-- Type extensions for NextAuth in `types/next-auth.d.ts`
+### Authentication (Supabase Auth)
+- Uses **Supabase Auth** for authentication (migrated from NextAuth)
+- Supports email/password authentication
+- Session managed via Supabase cookies (automatic refresh)
+- User profiles stored in local `users` table (linked by Supabase Auth user ID)
+
+#### Supabase Client Files (`lib/supabase/`)
+- `client.ts` — Browser client for client components
+- `server.ts` — Server client for Server Components and Server Actions
+- `middleware.ts` — Session refresh in middleware
+
+#### Auth Helper Function
+```typescript
+import { auth } from "@/lib/supabase/server";
+
+// Returns session matching old NextAuth format
+const session = await auth();
+// { user: { id, email, name } } or null
+```
+
+#### Auth Actions (`lib/actions/auth.ts`)
+- `signUpAction` — Creates Supabase user + local profile
+- `signInAction` — Signs in with email/password
+- `signOutAction` — Signs out and redirects to login
+
+#### Environment Variables (Required)
+```
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_xxx
+```
+
+#### Why Supabase Auth?
+- Single auth system for web + future mobile apps (React Native)
+- Built-in token refresh and session management
+- Easy to add social logins (Google, Apple) later
+- Official SDKs for all platforms
 
 ### Route Protection (middleware.ts)
 - **Protected**: `/dashboard/*`, `/leagues/*`, `/mock-draft/*`, `/my-teams/*`, `/players/*`
@@ -769,15 +799,15 @@ Get the Transaction Pooler URL from: **Supabase Dashboard → Connect** (or Proj
 ### Vercel Environment Variables
 ```
 DATABASE_URL=postgresql://postgres.xxx:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres
-AUTH_SECRET=<any random string>
-AUTH_URL=https://your-app.vercel.app
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_xxx
 ```
 
 ### Local .env.local
 ```
 DATABASE_URL="postgresql://postgres.xxx:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
-AUTH_SECRET="your-secret"
-AUTH_URL="http://localhost:3000"
+NEXT_PUBLIC_SUPABASE_URL="https://xxx.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="sb_publishable_xxx"
 ```
 
 ### Database Connection Code (lib/db/index.ts)
