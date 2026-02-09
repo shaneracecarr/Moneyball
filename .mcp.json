@@ -12,10 +12,6 @@
         "--header",
         "x-api-key: 760540a073msh39d8377336215fbp1f2ad5jsndc6dd586ff8f"
       ]
-    },
-    "supabase": {
-      "type": "http",
-      "url": "https://mcp.supabase.com/mcp?project_ref=xvhubfzrakbecrpcxbka"
     }
   }
 }

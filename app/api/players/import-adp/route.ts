@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { auth } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { players } from "@/lib/db/schema";
 import { eq, like, or, sql } from "drizzle-orm";

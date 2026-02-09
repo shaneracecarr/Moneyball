@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { auth } from "@/auth";
+import { auth } from "@/lib/supabase/server";
 import { movePlayerSchema, pickupPlayerSchema, dropAndAddSchema } from "@/lib/validations/roster";
 import {
   getLeagueMembers,

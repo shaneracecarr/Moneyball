@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@/auth";
+import { auth } from "@/lib/supabase/server";
 import { setupDraftSchema, makePickSchema } from "@/lib/validations/draft";
 import {
   getLeagueById,

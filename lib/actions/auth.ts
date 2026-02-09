@@ -1,13 +1,13 @@
 "use server";
 
-import { signIn } from "@/auth";
+import { createClient } from "@/lib/supabase/server";
 import { signUpSchema, signInSchema } from "@/lib/validations/auth";
-import { createUser, getUserByEmail } from "@/lib/db/queries";
-import bcrypt from "bcryptjs";
+import { createUserProfile, getUserById } from "@/lib/db/queries";
 import { redirect } from "next/navigation";
-import { AuthError } from "next-auth";
 
 export async function signUpAction(formData: FormData) {
+  const supabase = createClient();
+
   try {
     const rawData = {
       email: formData.get("email"),
@@ -19,32 +19,43 @@ export async function signUpAction(formData: FormData) {
 
     const validatedData = signUpSchema.parse(rawData);
 
-    // Check if user already exists
-    console.log("[Signup] Checking if user exists...");
-    const existingUser = await getUserByEmail(validatedData.email);
-    console.log("[Signup] Existing user check result:", existingUser ? "found" : "not found");
-
-    if (existingUser) {
-      return { error: "User with this email already exists" };
-    }
-
-    // Hash password
-    console.log("[Signup] Hashing password...");
-    const hashedPassword = await bcrypt.hash(validatedData.password, 10);
-
-    // Create user
-    console.log("[Signup] Creating user in database...");
-    const newUser = await createUser(validatedData.email, hashedPassword, validatedData.name);
-    console.log("[Signup] User created:", newUser ? "success" : "failed");
-
-    // Sign in the user
-    console.log("[Signup] Signing in user...");
-    await signIn("credentials", {
+    // Sign up with Supabase Auth
+    const { data, error } = await supabase.auth.signUp({
       email: validatedData.email,
       password: validatedData.password,
-      redirect: false,
+      options: {
+        data: {
+          name: validatedData.name || null,
+        },
+      },
     });
-    console.log("[Signup] Sign in complete");
+
+    if (error) {
+      console.error("[Signup] Supabase error:", error.message);
+      if (error.message.includes("already registered")) {
+        return { error: "User with this email already exists" };
+      }
+      return { error: error.message };
+    }
+
+    if (!data.user) {
+      return { error: "Failed to create user" };
+    }
+
+    console.log("[Signup] Supabase user created:", data.user.id);
+
+    // Create a profile in our users table (for foreign key relationships)
+    try {
+      await createUserProfile(
+        data.user.id,
+        validatedData.email,
+        validatedData.name
+      );
+      console.log("[Signup] Profile created in users table");
+    } catch (profileError) {
+      console.error("[Signup] Profile creation error:", profileError);
+      // Don't fail signup if profile creation fails - we can sync later
+    }
   } catch (error) {
     console.error("[Signup] Error:", error);
     if (error instanceof Error) {
@@ -57,6 +68,8 @@ export async function signUpAction(formData: FormData) {
 }
 
 export async function signInAction(formData: FormData) {
+  const supabase = createClient();
+
   try {
     const rawData = {
       email: formData.get("email"),
@@ -65,15 +78,16 @@ export async function signInAction(formData: FormData) {
 
     const validatedData = signInSchema.parse(rawData);
 
-    await signIn("credentials", {
+    const { error } = await supabase.auth.signInWithPassword({
       email: validatedData.email,
       password: validatedData.password,
-      redirect: false,
     });
-  } catch (error) {
-    if (error instanceof AuthError) {
+
+    if (error) {
+      console.error("[SignIn] Supabase error:", error.message);
       return { error: "Invalid email or password" };
     }
+  } catch (error) {
     if (error instanceof Error) {
       return { error: error.message };
     }
@@ -81,4 +95,10 @@ export async function signInAction(formData: FormData) {
   }
 
   redirect("/dashboard");
+}
+
+export async function signOutAction() {
+  const supabase = createClient();
+  await supabase.auth.signOut();
+  redirect("/login");
 }

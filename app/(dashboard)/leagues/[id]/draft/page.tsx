@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { auth } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getDraftStateAction } from "@/lib/actions/draft";
 import { getLeagueSettings } from "@/lib/db/queries";

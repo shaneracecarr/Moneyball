@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { auth } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getUserRosterAction } from "@/lib/actions/roster";
 import { getLeagueDetailsAction } from "@/lib/actions/leagues";

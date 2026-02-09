@@ -19,6 +19,20 @@ export async function createUser(email: string, password: string, name?: string)
   return result[0];
 }
 
+// Create a user profile linked to Supabase Auth (no password stored locally)
+export async function createUserProfile(id: string, email: string, name?: string | null) {
+  const result = await db
+    .insert(users)
+    .values({
+      id, // Use the Supabase Auth user ID
+      email,
+      password: "SUPABASE_AUTH", // Placeholder - not used
+      name: name || null
+    })
+    .returning();
+  return result[0];
+}
+
 export async function createLeague(
   name: string,
   numberOfTeams: number,

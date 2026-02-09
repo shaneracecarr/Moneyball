@@ -1,5 +1,5 @@
 import { Hero } from "@/components/home/hero";
-import { auth } from "@/auth";
+import { auth } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";

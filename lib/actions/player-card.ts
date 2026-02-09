@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { auth } from "@/auth";
+import { auth } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { players, playerGameStats } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";

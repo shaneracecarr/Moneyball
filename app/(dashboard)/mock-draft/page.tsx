@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { auth } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { MockDraftBoard } from "@/components/mock-draft/mock-draft-board";
 import { getAllPlayersAction } from "@/lib/actions/mock-draft";

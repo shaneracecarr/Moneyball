@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@/auth";
+import { auth } from "@/lib/supabase/server";
 import { db } from "@/lib/db";
 import { leagues, users } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";

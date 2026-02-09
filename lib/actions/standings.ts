@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@/auth";
+import { auth } from "@/lib/supabase/server";
 import { getLeagueMembers, getScoredMatchups } from "@/lib/db/queries";
 
 export type TeamStanding = {

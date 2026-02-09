@@ -1,4 +1,5 @@
-import { auth, signOut } from "@/auth";
+import { auth } from "@/lib/supabase/server";
+import { signOutAction } from "@/lib/actions/auth";
 import { cookies } from "next/headers";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -90,12 +91,7 @@ export async function Navbar() {
                 {session.user.email}
               </span>
             )}
-            <form
-              action={async () => {
-                "use server";
-                await signOut({ redirectTo: "/login" });
-              }}
-            >
+            <form action={signOutAction}>
               <Button type="submit" variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white bg-transparent">
                 Sign Out
               </Button>
