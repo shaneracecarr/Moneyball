@@ -1,4 +1,5 @@
 # Moneyball - Fantasy Football League Manager
+https://moneyball-five.vercel.app/
 
 A modern fantasy football league management application built with Next.js 14, NextAuth v5, and SQLite.
 
